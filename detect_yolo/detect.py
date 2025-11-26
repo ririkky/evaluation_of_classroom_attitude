@@ -34,12 +34,12 @@ def detect(save_img=False):
     (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
     
     # --- ★修正: 顔画像保存用のディレクトリ (Pathオブジェクトにし、mkdirを追加) ---
-    face_output_dir = Path("/Users/hayatanobuya/1/授業/ハッカソン/detect_yolo/output/images")
+    face_output_dir = Path("detect_yolo/output/images")
     face_output_dir.mkdir(parents=True, exist_ok=True) # ディレクトリが存在しない場合に作成
     # -----------------------------------------------------------------
 
     # --- ★追加: CSV保存用のディレクトリとファイルパス ---
-    csv_output_dir = Path("/Users/hayatanobuya/1/授業/ハッカソン/detect_yolo/output/file")
+    csv_output_dir = Path("detect_yolo/output/file")
     csv_output_dir.mkdir(parents=True, exist_ok=True) # ディレクトリを作成
     csv_file_path = csv_output_dir / "results.csv"
     # -----------------------------------------------
