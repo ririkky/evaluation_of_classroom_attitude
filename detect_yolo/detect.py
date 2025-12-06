@@ -306,8 +306,8 @@ def detect(save_img=False):
                                             eye_center_x = (left_eye_center_x + right_eye_center_x) / 2
 
 
-                                            # --- スコア計算（各25点満点、合計50点）---
-                                            # 顔の向き（縦:Pitch）: 45度超で0点、20度以内で満点、間は線形減点
+                                            # --- スコア計算（EAR=40点、Pitch=30点、Yaw=30点、合計100点）---
+                                            # 顔の向き（縦:Pitch）: 45度超で0点、20度以内で満点、間は線形減点（30点満点）
                                             if abs(pitch) <= 20:
                                                 pitch_score = 1.0
                                             elif abs(pitch) >= 45:
@@ -315,7 +315,7 @@ def detect(save_img=False):
                                             else:
                                                 pitch_score = (45 - abs(pitch)) / 25.0
 
-                                            # 顔の向き（横:Yaw）: 45度超で0点、20度以内で満点、間は線形減点
+                                            # 顔の向き（横:Yaw）: 45度超で0点、20度以内で満点、間は線形減点（30点満点）
                                             if abs(yaw) <= 20:
                                                 yaw_score = 1.0
                                             elif abs(yaw) >= 45:
@@ -323,7 +323,7 @@ def detect(save_img=False):
                                             else:
                                                 yaw_score = (45 - abs(yaw)) / 25.0
 
-                                            # 目の開き具合: EAR>=0.25で満点、0.15未満で0点、間は線形減点
+                                            # 目の開き具合: EAR>=0.25で満点、0.15未満で0点、間は線形減点（40点満点）
                                             if ear >= 0.25:
                                                 ear_score = 1.0
                                             elif ear < 0.15:
@@ -331,19 +331,19 @@ def detect(save_img=False):
                                             else:
                                                 ear_score = (ear - 0.15) / 0.10
 
-                                            # 合計スコア（50点満点）
+                                            # 合計スコア（100点満点）
                                             total_score = int(round(
-                                                max(0, min(25 * pitch_score, 25)) +
-                                                max(0, min(25 * yaw_score, 25)) +
-                                                max(0, min(25 * ear_score, 25))
+                                                max(0, min(30 * pitch_score, 30)) +
+                                                max(0, min(30 * yaw_score, 30)) +
+                                                max(0, min(40 * ear_score, 40))
                                             ))
 
 
-                                            # スコアに応じてstatusを変更（good:40点以上, normal:30点以上, bad:それ未満）
-                                            if total_score >= 40:
+                                            # スコアに応じてstatusを変更（good:70点以上, normal:50点以上, bad:それ未満）
+                                            if total_score >= 70:
                                                 status = f"good ({total_score})"
                                                 color = (0, 0, 255) # 赤
-                                            elif total_score >= 30:
+                                            elif total_score >= 50:
                                                 status = f"normal ({total_score})"
                                                 color = (0, 165, 255) # オレンジ
                                             else:
