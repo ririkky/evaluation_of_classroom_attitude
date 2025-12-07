@@ -4,11 +4,7 @@ from flask import Flask, render_template, jsonify, send_from_directory
 
 app = Flask(__name__)
 
-# =====================================================
-# output/file/results.csv を読み込み、画像と評価を対応づけ
-# =====================================================
 def load_results_from_csv():
-    # app3.py（UI直下）から見たパス
     base_dir = os.path.join(app.root_path, 'output')
     csv_path = os.path.join(base_dir, 'file', 'results.csv')
     images_dir = os.path.join(base_dir, 'images')
@@ -20,24 +16,29 @@ def load_results_from_csv():
             reader = csv.DictReader(file)
 
             for row in reader:
-                mesh_id = row.get('メッシュID', '').strip()
-                filename = row.get('画像', '').strip()
-                evaluation = row.get('評価', '').strip()
+                mesh_id      = row.get('メッシュID', '').strip()
+                path_value   = row.get('パス', '').strip()
+                total_score  = row.get('総合スコア', '').strip()
+                pitch_score  = row.get('Pitchスコア', '').strip()
+                yaw_score    = row.get('Yawスコア', '').strip()
+                ear_score    = row.get('EARスコア', '').strip()
 
-                # images内のファイルを確認
+                filename = os.path.basename(path_value)
                 image_path = os.path.join(images_dir, filename)
                 if not os.path.exists(image_path):
                     print(f"⚠️ 画像が見つかりません: {image_path}")
                     continue
 
-                # FlaskでアクセスできるURLを作成
                 image_url = f"/images/{filename}"
 
                 image_map.append({
                     'mesh_id': mesh_id,
                     'filename': filename,
                     'url': image_url,
-                    'evaluation': evaluation
+                    'total_score': total_score,
+                    'pitch_score': pitch_score,
+                    'yaw_score': yaw_score,
+                    'ear_score': ear_score,
                 })
 
     except FileNotFoundError:
@@ -48,9 +49,6 @@ def load_results_from_csv():
     return image_map
 
 
-# =====================================================
-# Flaskルート
-# =====================================================
 @app.route('/')
 def index():
     image_data = load_results_from_csv()
@@ -63,9 +61,6 @@ def get_images():
     return jsonify(image_data)
 
 
-# =====================================================
-# /images/... にアクセスしたら output/images から返す
-# =====================================================
 @app.route('/images/<path:filename>')
 def serve_images(filename):
     images_dir = os.path.join(app.root_path, 'output', 'images')
