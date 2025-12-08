@@ -203,6 +203,82 @@ def detect_endpoint():
         return jsonify({'success': False, 'error': f'サーバーエラー: {str(e)}'}), 500
 
 
+# ★修正: 動画フレーム処理エンドポイント
+@app.route('/api/detect_frame', methods=['POST'])
+def detect_frame():
+    """
+    動画の1フレームをBase64画像として受け取り、detect.pyで処理
+    """
+    try:
+        data = request.get_json()
+        image_data = data.get('image_data', '')
+
+        if not image_data:
+            return jsonify({'success': False, 'error': 'image_dataが必要です'}), 400
+
+        # Base64 画像データをファイルに保存
+        import base64
+        if ',' in image_data:
+            image_data = image_data.split(',')[1]
+
+        frame_bytes = base64.b64decode(image_data)
+        frame_path = os.path.join(TEMP_INPUT_DIR, 'temp_frame.jpg')
+        
+        with open(frame_path, 'wb') as f:
+            f.write(frame_bytes)
+
+        # detect.py を実行（フレーム処理用）
+        detect_cmd = [
+            sys.executable, "detect.py",
+            "--weights", "yolov7.pt",
+            "--conf", "0.25",
+            "--img-size", "640",
+            "--source", "temp_input/temp_frame.jpg",
+            "--class", "0",
+            "--save-txt",
+            "--save-faces"
+        ]
+
+        result = subprocess.run(
+            detect_cmd,
+            cwd=DETECT_DIR,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        if result.returncode != 0:
+            return jsonify({'success': False, 'error': 'detect.py実行エラー'}), 500
+
+        # CSVから検出結果を読み込む
+        if os.path.exists(CSV_PATH):
+            with open(CSV_PATH, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                rows = list(reader)
+                
+                if rows:
+                    last_row = rows[-1]
+                    return jsonify({
+                        'success': True,
+                        'pitch_score': last_row.get('Pitchスコア', '0'),
+                        'yaw_score': last_row.get('Yawスコア', '0'),
+                        'ear_score': last_row.get('EARスコア', '0'),
+                        'pitch_angle': last_row.get('Pitch角度(度)', '0'),
+                        'yaw_angle': last_row.get('Yaw角度(度)', '0'),
+                        'ear_value': last_row.get('EAR値', '0')
+                    })
+
+        return jsonify({
+            'pitch_score': '0',
+            'yaw_score': '0',
+            'ear_score': '0'
+        })
+
+    except Exception as e:
+        print(f"❌ フレーム処理エラー: {e}")
+        return jsonify({'success': False, 'error': f'サーバーエラー: {str(e)}'}), 500
+
+
 # ★修正: 画像ファイルを提供するためのルート
 @app.route('/images/faces/<path:filename>')
 def serve_faces(filename):
