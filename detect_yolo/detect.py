@@ -124,7 +124,7 @@ def detect(save_img=False):
     # --- solvePnP用 3Dモデル座標 ---
 
     # --- ★追加: CSVファイルを初期化 (ヘッダー書き込み) ---
-    csv_header = ["メッシュID", "パス", "総合スコア", "Pitchスコア", "Yawスコア", "EARスコア"]
+    csv_header = ["メッシュID", "パス", "総合スコア", "Pitchスコア", "Yawスコア", "EARスコア", "Pitch角度(度)", "Yaw角度(度)", "EAR値", "ランドマーク画像"]
     # 'w' (write)モードでファイルを開き、ヘッダーを書き込む
     # 実行のたびに上書きされます
     try:
@@ -363,6 +363,47 @@ def detect(save_img=False):
                                             status = "error"
                                             total_score = 0
 
+                                        # --- ★ランドマーク可視化画像の保存 ---
+                                        vis_filename = ""
+                                        if opt.save_faces:
+                                            try:
+                                                # 可視化用に別のコピーを作成
+                                                vis_roi = person_roi.copy()
+                                                h_roi, w_roi = vis_roi.shape[:2]
+                                                
+                                                # Pitch/Yaw用のランドマークを強調表示（赤い大きな円）
+                                                for idx in POSE_INDICES:
+                                                    lm = face_landmarks.landmark[idx]
+                                                    cx, cy = int(lm.x * w_roi), int(lm.y * h_roi)
+                                                    cv2.circle(vis_roi, (cx, cy), 5, (0, 0, 255), -1)  # 赤い円
+                                                    cv2.putText(vis_roi, f"#{idx}", (cx+8, cy-8), 
+                                                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
+                                                
+                                                # EAR用のランドマークを強調表示（青い円）
+                                                for idx in LEFT_EYE_INDICES + RIGHT_EYE_INDICES:
+                                                    lm = face_landmarks.landmark[idx]
+                                                    cx, cy = int(lm.x * w_roi), int(lm.y * h_roi)
+                                                    cv2.circle(vis_roi, (cx, cy), 4, (255, 0, 0), -1)  # 青い円
+                                                    cv2.putText(vis_roi, f"#{idx}", (cx+8, cy-8), 
+                                                               cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255, 0, 0), 1)
+                                                
+                                                # Pitch/Yawの角度を画像に描画
+                                                cv2.putText(vis_roi, f"Pitch: {pitch:.1f}deg", (10, 30), 
+                                                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                                                cv2.putText(vis_roi, f"Yaw: {yaw:.1f}deg", (10, 60), 
+                                                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                                                cv2.putText(vis_roi, f"EAR: {ear:.3f}", (10, 90), 
+                                                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+                                                
+                                                # 可視化画像を保存
+                                                vis_filename = f"landmarks_{face_filename}"
+                                                vis_path = save_dir / 'faces' / vis_filename
+                                                cv2.imwrite(str(vis_path), vis_roi)
+                                                print(f"  → Landmarks visualization saved: {vis_filename}")
+                                            except Exception as e_vis:
+                                                print(f"Error saving landmarks visualization: {e_vis}")
+                                        # -----------------------------------
+
                                         # --- ★追加: CSVファイルへの追記 ---
                                         # --save-faces が指定されている場合のみ、CSVに書き込む
                                         # (画像パス face_save_path_str が "パス" 列に必要なため)
@@ -371,14 +412,18 @@ def detect(save_img=False):
                                                 # 'a' (append)モードでファイルを開く
                                                 with open(csv_file_path, 'a', newline='', encoding='utf-8') as f_csv:
                                                     writer = csv.writer(f_csv)
-                                                    # [メッシュID, パス, 総合スコア, Pitch, Yaw, EAR]
+                                                    # [メッシュID, パス, 総合スコア, Pitch, Yaw, EAR, Pitch角度, Yaw角度, EAR値, ランドマーク画像]
                                                     row_data = [
                                                         face_id,
                                                         face_filename,
                                                         total_score,
                                                         int(round(30 * pitch_score)),
                                                         int(round(30 * yaw_score)),
-                                                        int(round(40 * ear_score))
+                                                        int(round(40 * ear_score)),
+                                                        f"{pitch:.1f}",      # Pitch角度（度）
+                                                        f"{yaw:.1f}",        # Yaw角度（度）
+                                                        f"{ear:.3f}",        # EAR値
+                                                        vis_filename         # ランドマーク画像
                                                     ]
                                                     writer.writerow(row_data)
                                             except Exception as e:

@@ -4,24 +4,151 @@
   <meta charset="utf-8">
   <title>授業態度評価ビューア</title>
   <style>
-    /* テーブルの見た目調整 */
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: #333;
+    }
+
+    /* ========== アップロードセクション ========== */
+    .upload-section {
+      background-color: #f0f0f0;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    .upload-section h2 {
+      margin-top: 0;
+    }
+
+    #imageInput {
+      padding: 10px;
+      margin-right: 10px;
+    }
+
+    #uploadBtn {
+      padding: 10px 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    #uploadBtn:hover {
+      background-color: #45a049;
+    }
+
+    #uploadBtn:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+
+    .upload-status {
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    .spinner {
+      display: none;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #4CAF50;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      animation: spin 1s linear infinite;
+      margin-right: 10px;
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* ========== ボタンセクション ========== */
+    .button-section {
+      margin: 20px 0;
+    }
+
+    .button-section button {
+      padding: 10px 20px;
+      margin-right: 10px;
+      background-color: #2196F3;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .button-section button:hover {
+      background-color: #0b7dda;
+    }
+
+    /* ========== テーブルスタイル ========== */
     table {
       border-collapse: collapse;
       margin-top: 20px;
-    }
-    th, td {
-      padding: 8px 12px;
-      vertical-align: top;
-    }
-    th {
-      text-align: left;
-    }
-    img.thumb {
-      width: 150px;
-      cursor: pointer;
+      width: 100%;
+      border: 1px solid #ddd;
     }
 
-    /* モーダル背景 */
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+
+    th {
+      background-color: #4CAF50;
+      color: white;
+    }
+
+    tr:hover {
+      background-color: #f5f5f5;
+    }
+
+    img.thumb {
+      width: 120px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    /* ========== スコア表示 ========== */
+    .score {
+      font-weight: bold;
+      padding: 8px 12px;
+      border-radius: 4px;
+      text-align: center;
+    }
+
+    .score-good {
+      background-color: #d4edda;
+      color: #155724;
+    }
+
+    .score-normal {
+      background-color: #fff3cd;
+      color: #856404;
+    }
+
+    .score-bad {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+
+    /* ========== モーダル ========== */
     .modal {
       display: none;
       position: fixed;
@@ -33,7 +160,6 @@
       background-color: rgba(0, 0, 0, 0.8);
     }
 
-    /* 拡大画像 */
     .modal-content {
       display: block;
       margin: 5% auto;
@@ -41,7 +167,6 @@
       border-radius: 10px;
     }
 
-    /* 閉じるボタン */
     .close {
       position: absolute;
       top: 20px;
@@ -50,22 +175,859 @@
       font-size: 40px;
       cursor: pointer;
     }
+
+    /* ========== 説明モーダル用スタイル ========== */
+    .info-modal {
+      display: none;
+      position: fixed;
+      z-index: 2000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.8);
+    }
+
+    .info-modal-content {
+      background-color: #fefefe;
+      margin: 5% auto;
+      padding: 30px;
+      border-radius: 10px;
+      width: 80%;
+      max-width: 800px;
+      position: relative;
+    }
+
+    .info-close {
+      position: absolute;
+      top: 10px;
+      right: 20px;
+      color: #aaa;
+      font-size: 35px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .info-close:hover {
+      color: #000;
+    }
+
+    .clickable-value {
+      cursor: pointer;
+      color: #2196F3;
+      text-decoration: underline;
+      font-weight: bold;
+    }
+
+    .clickable-value:hover {
+      color: #1976D2;
+    }
+
+    /* ========== エラー/メッセージ ========== */
+    .error {
+      color: #d32f2f;
+      padding: 10px;
+      background-color: #ffebee;
+      border-radius: 4px;
+      margin-top: 10px;
+    }
+
+    .success {
+      color: #388e3c;
+      padding: 10px;
+      background-color: #e8f5e9;
+      border-radius: 4px;
+      margin-top: 10px;
+    }
+
+    #result {
+      margin-top: 20px;
+    }
   </style>
 </head>
 <body>
-  <h2>images フォルダ内の画像を表示</h2>
+  <div class="container">
+    <h1>授業態度評価システム</h1>
 
-  <button id="showTableBtn">画像＋スコアを表示</button>
-  <button id="showPhotosBtn">写真だけ表示</button>
+    <!-- ========== アップロードセクション ========== -->
+    <div class="upload-section">
+      <h2>📸 画像をアップロード</h2>
+      <div>
+        <input type="file" id="imageInput" accept="image/*" />
+        <button id="uploadBtn">検出実行</button>
+      </div>
+      <div class="upload-status">
+        <span id="statusMessage"></span>
+      </div>
+    </div>
 
-  <div id="result" style="margin-top:20px;"></div>
+    <!-- ========== ボタンセクション ========== -->
+    <div class="button-section">
+      <button id="showPhotosOnlyBtn">🖼️ 写真だけ表示</button>
+      <button id="showPhotosScoreBtn">📊 写真＋スコア表示</button>
+      <button id="showDetailBtn">📋 詳細を全て表示</button>
+      <button id="showReferenceBtn">📚 参考資料（20段階スケール）</button>
+    </div>
 
-  <!-- モーダル領域 -->
+    <!-- ========== 結果表示エリア ========== -->
+    <div id="result"></div>
+  </div>
+
+  <!-- モーダル領域（画像拡大用） -->
   <div id="myModal" class="modal">
     <span class="close">&times;</span>
     <img class="modal-content" id="modalImg">
   </div>
 
-  <script src="/static/script.js"></script>
+  <!-- 説明モーダル（評価方法の説明用） -->
+  <div id="infoModal" class="info-modal">
+    <div class="info-modal-content">
+      <span class="info-close">&times;</span>
+      <div id="infoContent"></div>
+    </div>
+  </div>
+
+  <script>
+    // ========== グローバル変数 ==========
+    let allImages = [];
+
+    // ========== ファイルアップロード処理 ==========
+    document.getElementById('uploadBtn').addEventListener('click', function() {
+      const fileInput = document.getElementById('imageInput');
+      const file = fileInput.files[0];
+
+      if (!file) {
+        showStatus('画像を選択してください', 'error');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const uploadBtn = document.getElementById('uploadBtn');
+      uploadBtn.disabled = true;
+      showStatus('🔄 処理中...', 'info');
+
+      // detect.py 実行API呼び出し
+      fetch('/api/detect', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          showStatus('✅ 検出完了！結果を読み込み中...', 'success');
+          // 結果を再度読み込む
+          loadImages();
+          setTimeout(() => {
+            showDetail();
+          }, 500);
+        } else {
+          showStatus('❌ エラー: ' + (data.error || '検出に失敗しました'), 'error');
+        }
+        uploadBtn.disabled = false;
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        showStatus('❌ 通信エラー: ' + error.message, 'error');
+        uploadBtn.disabled = false;
+      });
+    });
+
+    // ========== 画像読み込み関数 ==========
+    function loadImages() {
+      fetch('/api/images')
+        .then(response => response.json())
+        .then(data => {
+          allImages = data;
+          console.log('Images loaded:', allImages);
+        })
+        .catch(error => console.error('Error loading images:', error));
+    }
+
+    // ========== 詳細を全て表示 ==========
+    function showDetail() {
+      const resultDiv = document.getElementById('result');
+
+      if (allImages.length === 0) {
+        resultDiv.innerHTML = '<p style="color: #666;">表示する画像がありません。画像をアップロードしてください。</p>';
+        return;
+      }
+
+      let html = '<table><thead><tr>' +
+        '<th>メッシュID</th>' +
+        '<th>顔画像</th>' +
+        '<th>総合スコア</th>' +
+        '<th>Pitch<br/>スコア</th>' +
+        '<th>Pitch<br/>角度</th>' +
+        '<th>Yaw<br/>スコア</th>' +
+        '<th>Yaw<br/>角度</th>' +
+        '<th>EAR<br/>スコア</th>' +
+        '<th>EAR<br/>値</th>' +
+        '<th>ランドマーク<br/>詳細</th>' +
+        '</tr></thead><tbody>';
+
+      allImages.forEach(img => {
+        const scoreClass = getScoreClass(parseInt(img.total_score));
+        html += '<tr>' +
+          `<td>${img.mesh_id}</td>` +
+          `<td><img class="thumb" src="${img.url}" alt="face" onclick="openModal('${img.url}')"></td>` +
+          `<td><div class="score ${scoreClass}">${img.total_score}点</div></td>` +
+          `<td>${img.pitch_score}点</td>` +
+          `<td><span class="clickable-value" onclick="showPitchInfo('${img.landmark_url}', '${img.pitch_angle}')">${img.pitch_angle || '-'}°</span></td>` +
+          `<td>${img.yaw_score}点</td>` +
+          `<td><span class="clickable-value" onclick="showYawInfo('${img.landmark_url}', '${img.yaw_angle}')">${img.yaw_angle || '-'}°</span></td>` +
+          `<td>${img.ear_score}点</td>` +
+          `<td><span class="clickable-value" onclick="showEarInfo('${img.landmark_url}', '${img.ear_value}')">${img.ear_value || '-'}</span></td>` +
+          `<td>${img.landmark_url ? `<img class="thumb" src="${img.landmark_url}" alt="landmarks" onclick="openModal('${img.landmark_url}')" style="cursor:pointer; border:2px solid #2196F3;">` : '-'}</td>` +
+          '</tr>';
+      });
+
+      html += '</tbody></table>';
+      
+      // ランドマーク説明を追加
+      html += '<div style="margin-top: 30px; padding: 20px; background-color: #f9f9f9; border-radius: 8px;">';
+      html += '<h3 style="margin-top: 0; color: #333;">📍 使用しているメッシュポイント（ランドマーク）</h3>';
+      html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">';
+      
+      // Pitch/Yaw (solvePnP用)
+      html += '<div style="border: 2px solid #4CAF50; padding: 15px; border-radius: 8px; background-color: white;">';
+      html += '<h4 style="color: #4CAF50; margin-top: 0;">🔄 Pitch / Yaw（顔の向き）</h4>';
+      html += '<p style="font-size: 13px; color: #666;">solvePnP法で6つのランドマークから3D姿勢を推定</p>';
+      html += '<ul style="font-size: 14px; line-height: 1.8;">';
+      html += '<li><strong>#1</strong>: 鼻先 (Nose tip)</li>';
+      html += '<li><strong>#152</strong>: 顎 (Chin)</li>';
+      html += '<li><strong>#33</strong>: 左目内側 (Left eye inner corner)</li>';
+      html += '<li><strong>#263</strong>: 右目内側 (Right eye inner corner)</li>';
+      html += '<li><strong>#61</strong>: 口角左 (Left mouth corner)</li>';
+      html += '<li><strong>#291</strong>: 口角右 (Right mouth corner)</li>';
+      html += '</ul>';
+      html += '<p style="font-size: 12px; color: #999; margin-top: 10px;">※ これら6点の3D座標から顔の傾き（Pitch）と回転（Yaw）を計算</p>';
+      html += '<p style="font-size: 12px; color: #E91E63; margin-top: 5px;"><strong>🔴 赤い円と番号</strong>で表示されます</p>';
+      html += '</div>';
+      
+      // EAR
+      html += '<div style="border: 2px solid #2196F3; padding: 15px; border-radius: 8px; background-color: white;">';
+      html += '<h4 style="color: #2196F3; margin-top: 0;">👁️ EAR（目の開き具合）</h4>';
+      html += '<p style="font-size: 13px; color: #666;">両目各6ポイントから開眼度を計算</p>';
+      html += '<div style="margin-bottom: 10px;">';
+      html += '<strong style="color: #FF9800;">左目:</strong>';
+      html += '<ul style="font-size: 14px; line-height: 1.8; margin-top: 5px;">';
+      html += '<li>#33, #160, #158, #133, #153, #144</li>';
+      html += '</ul>';
+      html += '</div>';
+      html += '<div>';
+      html += '<strong style="color: #FF9800;">右目:</strong>';
+      html += '<ul style="font-size: 14px; line-height: 1.8; margin-top: 5px;">';
+      html += '<li>#362, #385, #387, #263, #373, #380</li>';
+      html += '</ul>';
+      html += '</div>';
+      html += '<p style="font-size: 12px; color: #999; margin-top: 10px;">※ EAR = (垂直距離平均) / (水平距離)</p>';
+      html += '<p style="font-size: 12px; color: #2196F3; margin-top: 5px;"><strong>🔵 青い円と番号</strong>で表示されます</p>';
+      html += '</div>';
+      
+      html += '</div>'; // grid終了
+      
+      // MediaPipe参考リンク
+      html += '<div style="margin-top: 20px; padding: 15px; background-color: #e3f2fd; border-left: 4px solid #2196F3; border-radius: 4px;">';
+      html += '<p style="margin: 0; font-size: 14px;"><strong>📚 詳細:</strong> MediaPipe Face Mesh は顔に478個のランドマークを配置します。</p>';
+      html += '<p style="margin: 10px 0 0 0; font-size: 13px; color: #666;">参考: <a href="https://github.com/google/mediapipe/blob/master/mediapipe/modules/face_geometry/data/canonical_face_model_uv_visualization.png" target="_blank" style="color: #2196F3;">MediaPipe Face Mesh ランドマークマップ</a></p>';
+      html += '</div>';
+      
+      html += '</div>'; // ランドマーク説明終了
+      
+      resultDiv.innerHTML = html;
+    }
+
+    // ========== 写真だけ表示 ==========
+    function showPhotosOnly() {
+      const resultDiv = document.getElementById('result');
+
+      if (allImages.length === 0) {
+        resultDiv.innerHTML = '<p style="color: #666;">表示する画像がありません。画像をアップロードしてください。</p>';
+        return;
+      }
+
+      let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;">';
+
+      allImages.forEach(img => {
+        html += `<div style="cursor: pointer; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">` +
+          `<img src="${img.url}" style="width: 100%; height: auto; display: block;" onclick="openModal('${img.url}')" alt="face">` +
+          `</div>`;
+      });
+
+      html += '</div>';
+      resultDiv.innerHTML = html;
+    }
+
+    // ========== 写真とスコア表示 ==========
+    function showPhotosScore() {
+      const resultDiv = document.getElementById('result');
+
+      if (allImages.length === 0) {
+        resultDiv.innerHTML = '<p style="color: #666;">表示する画像がありません。画像をアップロードしてください。</p>';
+        return;
+      }
+
+      let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;">';
+
+      allImages.forEach(img => {
+        const scoreClass = getScoreClass(parseInt(img.total_score));
+        html += `<div style="cursor: pointer; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">` +
+          `<img src="${img.url}" style="width: 100%; height: auto; display: block;" onclick="openModal('${img.url}')" alt="face">` +
+          `<div style="padding: 10px; background-color: #f9f9f9;">` +
+          `<p style="margin: 0; text-align: center; font-weight: bold;">ID: ${img.mesh_id}</p>` +
+          `<div class="score ${scoreClass}" style="margin-top: 5px;">${img.total_score}点</div>` +
+          `</div>` +
+          `</div>`;
+      });
+
+      html += '</div>';
+      resultDiv.innerHTML = html;
+    }
+
+    // ========== 参考資料（20段階スケール）表示 ==========
+    function showReference() {
+      const resultDiv = document.getElementById('result');
+      
+      let html = '<div style="max-width: 1200px; margin: 0 auto;">';
+      
+      // ========== Pitch用画像生成関数 ==========
+      function generatePitchFace(angle) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 80;
+        canvas.height = 80;
+        const ctx = canvas.getContext('2d');
+
+        // 背景色
+        ctx.fillStyle = '#f0e4d7'; // 肌色
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 顔の輪郭
+        ctx.beginPath();
+        ctx.arc(40, 40, 30, 0, Math.PI * 2, true);
+        ctx.fillStyle = '#ffe0bd';
+        ctx.fill();
+
+        // 目の描画
+        const eyeY = 40 + angle * 0.5; // 角度に応じて目の位置を調整
+        ctx.beginPath();
+        ctx.arc(30, eyeY, 5, 0, Math.PI * 2, true); // 左目
+        ctx.fillStyle = '#000';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(50, eyeY, 5, 0, Math.PI * 2, true); // 右目
+        ctx.fillStyle = '#000';
+        ctx.fill();
+
+        // 口の描画
+        const mouthY = 50 + angle * 0.3; // 角度に応じて口の位置を調整
+        ctx.beginPath();
+        ctx.arc(40, mouthY, 10, 0, Math.PI, angle > 0); // 上向きか下向きかで口の形を変える
+        ctx.strokeStyle = '#000';
+        ctx.stroke();
+
+        return canvas.toDataURL();
+      }
+      
+      // ========== Yaw用画像生成関数 ==========
+      function generateYawFace(angle) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 80;
+        canvas.height = 80;
+        const ctx = canvas.getContext('2d');
+
+        // 背景色
+        ctx.fillStyle = '#f0e4d7'; // 肌色
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 顔の輪郭
+        ctx.beginPath();
+        ctx.arc(40, 40, 30, 0, Math.PI * 2, true);
+        ctx.fillStyle = '#ffe0bd';
+        ctx.fill();
+
+        // 目の描画
+        const eyeOffset = angle * 0.3; // 角度に応じて目の位置を調整
+        ctx.beginPath();
+        ctx.arc(30 - eyeOffset, 35, 5, 0, Math.PI * 2, true); // 左目
+        ctx.fillStyle = '#000';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(50 - eyeOffset, 35, 5, 0, Math.PI * 2, true); // 右目
+        ctx.fillStyle = '#000';
+        ctx.fill();
+
+        // 口の描画
+        ctx.beginPath();
+        ctx.arc(40 - eyeOffset, 50, 10, 0, Math.PI, false); // 口の位置を調整
+        ctx.strokeStyle = '#000';
+        ctx.stroke();
+
+        return canvas.toDataURL();
+      }
+      
+      // Pitch スケール
+      html += `
+        <div style="margin-bottom: 40px;">
+          <h2 style="color: #FF6B6B; border-bottom: 3px solid #FF6B6B; padding-bottom: 10px;">📐 Pitch（顔の上下傾き） - 20段階スケール</h2>
+          <p style="color: #666; margin-bottom: 20px;">負の値（-）ほど床を見ている、正の値（+）ほど天井を見ているを示しています。</p>
+          
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 15px; margin-bottom: 30px;">
+      `;
+      
+      // Pitch: -20° から +20° まで 20段階
+      const pitchValues = [
+        {val: -20, label: '-20°', desc: '床を見ている'},
+        {val: -18, label: '-18°', desc: ''},
+        {val: -16, label: '-16°', desc: ''},
+        {val: -14, label: '-14°', desc: ''},
+        {val: -12, label: '-12°', desc: '下向き'},
+        {val: -10, label: '-10°', desc: ''},
+        {val: -8, label: '-8°', desc: ''},
+        {val: -6, label: '-6°', desc: ''},
+        {val: -4, label: '-4°', desc: 'やや下向き'},
+        {val: -2, label: '-2°', desc: ''},
+        {val: 0, label: '0°', desc: '正面（理想）'},
+        {val: 2, label: '+2°', desc: ''},
+        {val: 4, label: '+4°', desc: 'やや上向き'},
+        {val: 6, label: '+6°', desc: ''},
+        {val: 8, label: '+8°', desc: ''},
+        {val: 10, label: '+10°', desc: '上向き'},
+        {val: 12, label: '+12°', desc: ''},
+        {val: 14, label: '+14°', desc: ''},
+        {val: 16, label: '+16°', desc: ''},
+        {val: 20, label: '+20°', desc: '天井を見ている'}
+      ];
+      
+      pitchValues.forEach((p, idx) => {
+        const color = p.val < -5 ? '#1976D2' : p.val < 0 ? '#42A5F5' : p.val === 0 ? '#4CAF50' : p.val < 5 ? '#FF9800' : '#FF6B6B';
+        const opacity = 0.6 + (Math.abs(p.val) / 20) * 0.4;
+        const imgSrc = generatePitchFace(p.val);
+        
+        html += `
+          <div style="text-align: center;">
+            <img src="${imgSrc}" alt="Pitch ${p.val}°" 
+                 style="width: 70px; height: 70px; border-radius: 50%; border: 3px solid ${color}; object-fit: cover; opacity: ${opacity};">
+            <p style="margin: 8px 0 2px 0; font-weight: bold; color: ${color}; font-size: 13px;">${p.label}</p>
+            <p style="margin: 0; font-size: 11px; color: #999;">${p.desc}</p>
+          </div>
+        `;
+      });
+      
+      html += '</div></div>';
+      
+      // Yaw スケール
+      html += `
+        <div style="margin-bottom: 40px;">
+          <h2 style="color: #FF6B6B; border-bottom: 3px solid #FF6B6B; padding-bottom: 10px;">🔄 Yaw（顔の左右回転） - 20段階スケール</h2>
+          <p style="color: #666; margin-bottom: 20px;">負の値（-）ほど左向き、正の値（+）ほど右向きを示しています。</p>
+          
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 15px; margin-bottom: 30px;">
+      `;
+      
+      // Yaw: -30° から +30° まで 20段階
+      const yawValues = [
+        {val: -30, label: '-30°', desc: '大きく左向き'},
+        {val: -27, label: '-27°', desc: ''},
+        {val: -24, label: '-24°', desc: ''},
+        {val: -21, label: '-21°', desc: ''},
+        {val: -18, label: '-18°', desc: '左向き'},
+        {val: -15, label: '-15°', desc: ''},
+        {val: -12, label: '-12°', desc: ''},
+        {val: -9, label: '-9°', desc: ''},
+        {val: -6, label: '-6°', desc: 'やや左向き'},
+        {val: -3, label: '-3°', desc: ''},
+        {val: 0, label: '0°', desc: '正面（理想）'},
+        {val: 3, label: '+3°', desc: ''},
+        {val: 6, label: '+6°', desc: 'やや右向き'},
+        {val: 9, label: '+9°', desc: ''},
+        {val: 12, label: '+12°', desc: ''},
+        {val: 15, label: '+15°', desc: '右向き'},
+        {val: 18, label: '+18°', desc: ''},
+        {val: 21, label: '+21°', desc: ''},
+        {val: 24, label: '+24°', desc: ''},
+        {val: 30, label: '+30°', desc: '大きく右向き'}
+      ];
+      
+      yawValues.forEach((y, idx) => {
+        const color = y.val < -10 ? '#1976D2' : y.val < 0 ? '#42A5F5' : y.val === 0 ? '#4CAF50' : y.val < 10 ? '#FF9800' : '#FF6B6B';
+        const opacity = 0.6 + (Math.abs(y.val) / 30) * 0.4;
+        const imgSrc = generateYawFace(y.val);
+        
+        html += `
+          <div style="text-align: center;">
+            <img src="${imgSrc}" alt="Yaw ${y.val}°" 
+                 style="width: 70px; height: 70px; border-radius: 50%; border: 3px solid ${color}; object-fit: cover; opacity: ${opacity};">
+            <p style="margin: 8px 0 2px 0; font-weight: bold; color: ${color}; font-size: 13px;">${y.label}</p>
+            <p style="margin: 0; font-size: 11px; color: #999;">${y.desc}</p>
+          </div>
+        `;
+      });
+      
+      html += '</div></div>';
+      
+      // EAR スケール
+      html += `
+        <div style="margin-bottom: 40px;">
+          <h2 style="color: #2196F3; border-bottom: 3px solid #2196F3; padding-bottom: 10px;">👁️ EAR（目の開き具合） - 20段階スケール</h2>
+          <p style="color: #666; margin-bottom: 20px;">値が大きいほど目が開いています。0.20以上で「目が開いている（良好）」と判定されます。</p>
+          
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 15px; margin-bottom: 30px;">
+      `;
+      
+      // EAR: 0.05 から 0.62 まで 20段階（目だけの異なる画像を使用）
+      const earValues = [
+        {val: 0.05, label: '0.05', desc: '完全に閉じている', color: '#D32F2F', emoji: '😴'},
+        {val: 0.08, label: '0.08', desc: '', color: '#E53935', emoji: '😴'},
+        {val: 0.11, label: '0.11', desc: '', color: '#F44336', emoji: '😴'},
+        {val: 0.14, label: '0.14', desc: '', color: '#E64A19', emoji: '😑'},
+        {val: 0.17, label: '0.17', desc: '閉じ気味', color: '#FF6F00', emoji: '😑'},
+        {val: 0.20, label: '0.20', desc: '', color: '#FF8F00', emoji: '😑'},
+        {val: 0.23, label: '0.23', desc: '', color: '#FFA000', emoji: '😐'},
+        {val: 0.26, label: '0.26', desc: '', color: '#FFB300', emoji: '😐'},
+        {val: 0.29, label: '0.29', desc: '開いている', color: '#FBC02D', emoji: '😊'},
+        {val: 0.32, label: '0.32', desc: '', color: '#F9A825', emoji: '😊'},
+        {val: 0.35, label: '0.35', desc: '', color: '#8BC34A', emoji: '😊'},
+        {val: 0.38, label: '0.38', desc: '開いている', color: '#7CB342', emoji: '😊'},
+        {val: 0.41, label: '0.41', desc: '', color: '#689F38', emoji: '😃'},
+        {val: 0.44, label: '0.44', desc: '', color: '#558B2F', emoji: '😃'},
+        {val: 0.47, label: '0.47', desc: '', color: '#33691E', emoji: '😃'},
+        {val: 0.50, label: '0.50', desc: '', color: '#1B5E20', emoji: '😃'},
+        {val: 0.53, label: '0.53', desc: '', color: '#004D40', emoji: '😁'},
+        {val: 0.56, label: '0.56', desc: '', color: '#00695C', emoji: '😁'},
+        {val: 0.59, label: '0.59', desc: '', color: '#00796B', emoji: '😁'},
+        {val: 0.62, label: '0.62', desc: '非常に開いている', color: '#00897B', emoji: '😁'}
+      ];
+      
+      earValues.forEach((e, idx) => {
+        // 目の開き具合を絵文字で表現（各段階で異なる絵文字）
+        const eyeEmojis = ['😴', '😴', '😴', '😑', '😑', '😑', '😐', '😐', '😊', '😊', '😊', '😊', '😃', '😃', '😃', '😃', '😁', '😁', '😁', '😁'];
+        const emoji = eyeEmojis[idx];
+        
+        html += `
+          <div style="text-align: center;">
+            <div style="width: 70px; height: 70px; border-radius: 50%; border: 3px solid ${e.color}; object-fit: cover; display: flex; align-items: center; justify-content: center; margin: 0 auto; background-color: #f0f0f0; font-size: 40px;">
+              ${emoji}
+            </div>
+            <p style="margin: 8px 0 2px 0; font-weight: bold; color: ${e.color}; font-size: 13px;">${e.label}</p>
+            <p style="margin: 0; font-size: 11px; color: #999;">${e.desc}</p>
+          </div>
+        `;
+      });
+      
+      html += '</div></div>';
+      
+      // 説明
+      html += `
+        <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin-top: 30px;">
+          <h3 style="margin-top: 0; color: #333;">📊 使い方</h3>
+          <ul style="line-height: 2;">
+            <li><strong>Pitch（上下傾き）:</strong> 画像を上下に回転させて段階を表現しています</li>
+            <li><strong>Yaw（左右回転）:</strong> 画像が実際に左右に向くように表現しています（左向き/右向き）</li>
+            <li><strong>EAR（目の開き具合）:</strong> 絵文字で目の開き具合を表現しています（😴 ← → 😁）</li>
+          </ul>
+          <p style="color: #666; margin-bottom: 0;">各スケールは<strong>20段階</strong>に分割されており、実際の検出値との比較に使用できます。</p>
+        </div>
+      `;
+      
+      html += '</div>';
+      resultDiv.innerHTML = html;
+    }
+
+    // ========== スコアに基づくクラス取得 ==========
+    function getScoreClass(score) {
+      if (score >= 70) return 'score-good';
+      if (score >= 50) return 'score-normal';
+      return 'score-bad';
+    }
+
+    // ========== モーダル表示 ==========
+    function openModal(src) {
+      const modal = document.getElementById('myModal');
+      const modalImg = document.getElementById('modalImg');
+      modalImg.src = src;
+      modal.style.display = 'block';
+    }
+
+    // ========== モーダル閉じる ==========
+    document.querySelector('.close').addEventListener('click', function() {
+      document.getElementById('myModal').style.display = 'none';
+    });
+
+    window.addEventListener('click', function(event) {
+      const modal = document.getElementById('myModal');
+      if (event.target === modal) {
+        modal.style.display = 'none';
+      }
+    });
+
+    // ========== 説明モーダル表示関数 ==========
+    function showInfoModal(title, content, imageUrl) {
+      const modal = document.getElementById('infoModal');
+      const infoContent = document.getElementById('infoContent');
+      
+      let html = `<h2 style="color: #333; margin-top: 0;">${title}</h2>`;
+      
+      // ランドマーク画像がある場合は表示
+      if (imageUrl && imageUrl !== 'undefined' && imageUrl !== '') {
+        html += `<div style="text-align: center; margin: 20px 0; background-color: #f5f5f5; padding: 15px; border-radius: 8px;">
+          <p style="margin: 0 0 10px 0; font-weight: bold; color: #2196F3;">📸 この画像で使用したランドマーク</p>
+          <img src="${imageUrl}" style="max-width: 100%; max-height: 400px; border: 3px solid #2196F3; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);" alt="measurement">
+        </div>`;
+      } else {
+        // 画像がない場合は説明テキストを表示
+        html += `<div style="text-align: center; margin: 20px 0; background-color: #fff3e0; padding: 15px; border-radius: 8px; border: 2px dashed #FF9800;">
+          <p style="margin: 0; color: #F57C00;">⚠️ ランドマーク画像は新しく画像をアップロードすると表示されます</p>
+        </div>`;
+      }
+      
+      html += content;
+      
+      infoContent.innerHTML = html;
+      modal.style.display = 'block';
+    }
+
+    // ========== Pitch角度の説明 ==========
+    function showPitchInfo(landmarkUrl, pitchValue) {
+      const content = `
+        <div style="font-size: 16px; line-height: 1.8;">
+          <p><strong>検出値:</strong> <span style="color: #E91E63; font-size: 24px; font-weight: bold;">${pitchValue}°</span></p>
+          
+          <h3 style="color: #4CAF50;">📐 Pitch（顔の傾き：上下）とは</h3>
+          <p>顔が上を向いているか、下を向いているかを示す角度です。</p>
+          
+          <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 15px 0; text-align: center;">
+            <p style="font-size: 14px; color: #666; margin-bottom: 15px;">【視覚イメージ】</p>
+            <div style="display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap; gap: 15px;">
+              <div style="text-align: center;">
+                <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&h=120&fit=crop" alt="下向き" style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid #2196F3; object-fit: cover;">
+                <p style="margin: 5px 0; font-weight: bold; color: #2196F3;">-15°</p>
+                <p style="margin: 0; font-size: 12px; color: #666;">下向き（机を見ている）</p>
+              </div>
+              <div style="text-align: center;">
+                <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&h=120&fit=crop" alt="正面" style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid #4CAF50; object-fit: cover;">
+                <p style="margin: 5px 0; font-weight: bold; color: #4CAF50;">0°</p>
+                <p style="margin: 0; font-size: 12px; color: #666;">正面（理想）</p>
+              </div>
+              <div style="text-align: center;">
+                <img src="https://images.unsplash.com/photo-1534308983496-4674e80e4d87?w=120&h=120&fit=crop" alt="上向き" style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid #FF9800; object-fit: cover;">
+                <p style="margin: 5px 0; font-weight: bold; color: #FF9800;">+15°</p>
+                <p style="margin: 0; font-size: 12px; color: #666;">上向き（天井を見ている）</p>
+              </div>
+            </div>
+          </div>
+          
+          <h3 style="color: #4CAF50;">🔴 測定に使用するランドマーク（赤い円）</h3>
+          <ul style="background-color: #f9f9f9; padding: 15px; border-left: 4px solid #E91E63;">
+            <li><strong>#1</strong>: 鼻先 (Nose tip) - 顔の中心点</li>
+            <li><strong>#152</strong>: 顎 (Chin) - 顔の下端</li>
+            <li><strong>#33</strong>: 左目内側 (Left eye inner corner)</li>
+            <li><strong>#263</strong>: 右目内側 (Right eye inner corner)</li>
+            <li><strong>#61</strong>: 口角左 (Left mouth corner)</li>
+            <li><strong>#291</strong>: 口角右 (Right mouth corner)</li>
+          </ul>
+          
+          <h3 style="color: #4CAF50;">📏 測定方法</h3>
+          <p><strong>solvePnP法</strong>を使用して、上記6点の2D座標と既知の3Dモデル座標から顔の3次元姿勢を推定し、<strong>X軸回りの回転角度</strong>を算出します。</p>
+          
+          <div style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; margin-top: 15px;">
+            <p style="margin: 0;"><strong>💡 解釈:</strong></p>
+            <ul style="margin: 10px 0;">
+              <li><strong>正の値（+）</strong>: 顔が上を向いている → 天井を見ている可能性</li>
+              <li><strong>0°付近</strong>: 正面を向いている（理想的な授業姿勢）</li>
+              <li><strong>負の値（-）</strong>: 顔が下を向いている → 机を見ている、居眠りの可能性</li>
+            </ul>
+          </div>
+        </div>
+      `;
+      showInfoModal('🔄 Pitch角度（顔の上下傾き）の測定方法', content, landmarkUrl);
+    }
+
+    // ========== Yaw角度の説明 ==========
+    function showYawInfo(landmarkUrl, yawValue) {
+      const content = `
+        <div style="font-size: 16px; line-height: 1.8;">
+          <p><strong>検出値:</strong> <span style="color: #E91E63; font-size: 24px; font-weight: bold;">${yawValue}°</span></p>
+          
+          <h3 style="color: #4CAF50;">📐 Yaw（顔の回転：左右）とは</h3>
+          <p>顔が左を向いているか、右を向いているかを示す角度です。</p>
+          
+          <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 15px 0; text-align: center;">
+            <p style="font-size: 14px; color: #666; margin-bottom: 15px;">【視覚イメージ】</p>
+            <div style="display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap; gap: 15px;">
+              <div style="text-align: center;">
+                <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&h=120&fit=crop&rotate=30" alt="左向き" style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid #2196F3; object-fit: cover; transform: scaleX(-1);">
+                <p style="margin: 5px 0; font-weight: bold; color: #2196F3;">-20°</p>
+                <p style="margin: 0; font-size: 12px; color: #666;">左向き（左に気を取られている）</p>
+              </div>
+              <div style="text-align: center;">
+                <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&h=120&fit=crop" alt="正面" style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid #4CAF50; object-fit: cover;">
+                <p style="margin: 5px 0; font-weight: bold; color: #4CAF50;">0°</p>
+                <p style="margin: 0; font-size: 12px; color: #666;">正面（理想）</p>
+              </div>
+              <div style="text-align: center;">
+                <img src="https://images.unsplash.com/photo-1534308983496-4674e80e4d87?w=120&h=120&fit=crop" alt="右向き" style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid #FF9800; object-fit: cover;">
+                <p style="margin: 5px 0; font-weight: bold; color: #FF9800;">+20°</p>
+                <p style="margin: 0; font-size: 12px; color: #666;">右向き（右に気を取られている）</p>
+              </div>
+            </div>
+          </div>
+          
+          <h3 style="color: #4CAF50;">🔴 測定に使用するランドマーク（赤い円）</h3>
+          <ul style="background-color: #f9f9f9; padding: 15px; border-left: 4px solid #E91E63;">
+            <li><strong>#1</strong>: 鼻先 (Nose tip) - 顔の中心点</li>
+            <li><strong>#152</strong>: 顎 (Chin) - 顔の下端</li>
+            <li><strong>#33</strong>: 左目内側 (Left eye inner corner)</li>
+            <li><strong>#263</strong>: 右目内側 (Right eye inner corner)</li>
+            <li><strong>#61</strong>: 口角左 (Left mouth corner)</li>
+            <li><strong>#291</strong>: 口角右 (Right mouth corner)</li>
+          </ul>
+          
+          <h3 style="color: #4CAF50;">📏 測定方法</h3>
+          <p><strong>solvePnP法</strong>を使用して、上記6点の2D座標と既知の3Dモデル座標から顔の3次元姿勢を推定し、<strong>Y軸回りの回転角度</strong>を算出します。</p>
+          
+          <div style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; margin-top: 15px;">
+            <p style="margin: 0;"><strong>💡 解釈:</strong></p>
+            <ul style="margin: 10px 0;">
+              <li><strong>正の値（+）</strong>: 顔が右を向いている → 右側に気を取られている可能性</li>
+              <li><strong>0°付近</strong>: 正面を向いている（理想的な授業姿勢）</li>
+              <li><strong>負の値（-）</strong>: 顔が左を向いている → 左側に気を取られている可能性</li>
+            </ul>
+          </div>
+        </div>
+      `;
+      showInfoModal('🔄 Yaw角度（顔の左右回転）の測定方法', content, landmarkUrl);
+    }
+
+    // ========== EAR値の説明 ==========
+    function showEarInfo(landmarkUrl, earValue) {
+      const content = `
+        <div style="font-size: 16px; line-height: 1.8;">
+          <p><strong>検出値:</strong> <span style="color: #2196F3; font-size: 24px; font-weight: bold;">${earValue}</span></p>
+          
+          <h3 style="color: #2196F3;">👁️ EAR（Eye Aspect Ratio：目の開き具合）とは</h3>
+          <p>目がどれくらい開いているかを数値化した指標です。値が大きいほど目が開いています。</p>
+          
+          <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 15px 0;">
+            <p style="font-size: 14px; color: #666; margin: 0 0 15px 0; text-align: center;"><strong>【20段階の目の開き具合】</strong></p>
+            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px;">
+              <!-- EAR 0.05 -->
+              <div style="text-align: center;">
+                <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&brightness=0.7&contrast=1.2" alt="EAR 0.05" style="width: 70px; height: 70px; border-radius: 50%; border: 3px solid #D32F2F; object-fit: cover; opacity: 0.6;">
+                <p style="margin: 5px 0 0 0; font-weight: bold; color: #D32F2F; font-size: 12px;">0.05</p>
+                <p style="margin: 2px 0 0 0; font-size: 10px; color: #999;">完全に閉じている</p>
+              </div>
+              <!-- EAR 0.10 -->
+              <div style="text-align: center;">
+                <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&brightness=0.8&contrast=1.2" alt="EAR 0.10" style="width: 70px; height: 70px; border-radius: 50%; border: 3px solid #F44336; object-fit: cover; opacity: 0.7;">
+                <p style="margin: 5px 0 0 0; font-weight: bold; color: #F44336; font-size: 12px;">0.10</p>
+                <p style="margin: 2px 0 0 0; font-size: 10px; color: #999;">ほぼ閉じている</p>
+              </div>
+              <!-- EAR 0.15 -->
+              <div style="text-align: center;">
+                <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&brightness=0.85" alt="EAR 0.15" style="width: 70px; height: 70px; border-radius: 50%; border: 3px solid #FF6F00; object-fit: cover; opacity: 0.75;">
+                <p style="margin: 5px 0 0 0; font-weight: bold; color: #FF6F00; font-size: 12px;">0.15</p>
+                <p style="margin: 2px 0 0 0; font-size: 10px; color: #999;">かなり閉じている</p>
+              </div>
+              <!-- EAR 0.20 -->
+              <div style="text-align: center;">
+                <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&brightness=0.9" alt="EAR 0.20" style="width: 70px; height: 70px; border-radius: 50%; border: 3px solid #FFC107; object-fit: cover; opacity: 0.8;">
+                <p style="margin: 5px 0 0 0; font-weight: bold; color: #FFC107; font-size: 12px;">0.20</p>
+                <p style="margin: 2px 0 0 0; font-size: 10px; color: #999;">やや閉じ気味</p>
+              </div>
+              <!-- EAR 0.25 -->
+              <div style="text-align: center;">
+                <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop" alt="EAR 0.25" style="width: 70px; height: 70px; border-radius: 50%; border: 3px solid #8BC34A; object-fit: cover;">
+                <p style="margin: 5px 0 0 0; font-weight: bold; color: #8BC34A; font-size: 12px;">0.25</p>
+                <p style="margin: 2px 0 0 0; font-size: 10px; color: #999;">開いている（良好）</p>
+              </div>
+              <!-- EAR 0.30+ -->
+              <div style="text-align: center;">
+                <img src="https://images.unsplash.com/photo-1534308983496-4674e80e4d87?w=80&h=80&fit=crop" alt="EAR 0.30+" style="width: 70px; height: 70px; border-radius: 50%; border: 3px solid #4CAF50; object-fit: cover;">
+                <p style="margin: 5px 0 0 0; font-weight: bold; color: #4CAF50; font-size: 12px;">0.30+</p>
+                <p style="margin: 2px 0 0 0; font-size: 10px; color: #999;">非常に開いている</p>
+              </div>
+            </div>
+          </div>
+          
+          <h3 style="color: #2196F3;">🔵 測定に使用するランドマーク（青い円）</h3>
+          
+          <div style="background-color: #fff3e0; padding: 15px; border-left: 4px solid #FF9800; margin: 10px 0;">
+            <p style="margin: 0 0 10px 0;"><strong>左目（6点）:</strong></p>
+            <ul>
+              <li><strong>#33</strong>: 目頭（左端）</li>
+              <li><strong>#160, #158</strong>: 上まぶたの2点</li>
+              <li><strong>#133, #153</strong>: 下まぶたの2点</li>
+              <li><strong>#144</strong>: 目尻（右端）</li>
+            </ul>
+            <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">→ これらの点で<strong>目の縦幅と横幅</strong>を測定</p>
+          </div>
+          
+          <div style="background-color: #fff3e0; padding: 15px; border-left: 4px solid #FF9800; margin: 10px 0;">
+            <p style="margin: 0 0 10px 0;"><strong>右目（6点）:</strong></p>
+            <ul>
+              <li><strong>#362</strong>: 目頭（右端）</li>
+              <li><strong>#385, #387</strong>: 上まぶたの2点</li>
+              <li><strong>#263, #373</strong>: 下まぶたの2点</li>
+              <li><strong>#380</strong>: 目尻（左端）</li>
+            </ul>
+            <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">→ これらの点で<strong>目の縦幅と横幅</strong>を測定</p>
+          </div>
+          
+          <h3 style="color: #2196F3;">📏 計算式</h3>
+          <div style="background-color: #f5f5f5; padding: 15px; border-radius: 8px; font-family: monospace; text-align: center;">
+            <p style="margin: 0; font-size: 18px; font-weight: bold;">EAR = (垂直距離の平均) ÷ (水平距離)</p>
+            <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">垂直距離 = 上下のまぶた間の距離（2箇所の平均）</p>
+            <p style="margin: 5px 0 0 0; font-size: 14px; color: #666;">水平距離 = 目頭から目尻までの距離</p>
+          </div>
+          
+          <div style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; margin-top: 15px;">
+            <p style="margin: 0;"><strong>💡 解釈:</strong></p>
+            <ul style="margin: 10px 0;">
+              <li><strong>0.20以上</strong>: 目がしっかり開いている（良好な授業態度）</li>
+              <li><strong>0.15〜0.20</strong>: やや目が閉じ気味（集中力低下の可能性）</li>
+              <li><strong>0.15未満</strong>: 目が閉じている（居眠り、眠気の可能性が高い）</li>
+            </ul>
+            <p style="margin: 10px 0 0 0; padding: 10px; background-color: #fff9c4; border-radius: 4px;">
+              <strong>🎯 ポイント:</strong> 両目のEAR値の平均を取ることで、より正確な開眼度を測定します。
+            </p>
+          </div>
+        </div>
+      `;
+      showInfoModal('👁️ EAR値（目の開き具合）の測定方法', content, landmarkUrl);
+    }
+
+    // ========== 説明モーダルを閉じる ==========
+    document.querySelector('.info-close').addEventListener('click', function() {
+      document.getElementById('infoModal').style.display = 'none';
+    });
+
+    window.addEventListener('click', function(event) {
+      const infoModal = document.getElementById('infoModal');
+      if (event.target === infoModal) {
+        infoModal.style.display = 'none';
+      }
+    });
+
+    // ========== ボタンイベント ==========
+    document.getElementById('showPhotosOnlyBtn').addEventListener('click', showPhotosOnly);
+    document.getElementById('showPhotosScoreBtn').addEventListener('click', showPhotosScore);
+    document.getElementById('showDetailBtn').addEventListener('click', showDetail);
+    document.getElementById('showReferenceBtn').addEventListener('click', showReference);
+
+    // ========== ステータス表示 ==========
+    function showStatus(message, type = 'info') {
+      const statusDiv = document.getElementById('statusMessage');
+      statusDiv.textContent = message;
+      statusDiv.className = type;
+    }
+
+    // ========== 初期化 ==========
+    loadImages();
+  </script>
 </body>
 </html>
