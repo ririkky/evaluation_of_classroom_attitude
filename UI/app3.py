@@ -58,9 +58,15 @@ def load_results_from_csv():
                 # ランドマーク画像のURLも生成
                 landmark_url = ""
                 if landmark_img:
+                    # landmark_imgはCSVに記録されたファイル名
                     landmark_path = os.path.join(FACES_DIR, landmark_img)
                     if os.path.exists(landmark_path):
                         landmark_url = f"/images/faces/{landmark_img}"
+                    else:
+                        # デバッグ：ファイルが見つからない場合
+                        print(f"⚠️ Landmark image not found: {landmark_path}")
+                        print(f"  Expected file: {landmark_img}")
+                        print(f"  FACES_DIR: {FACES_DIR}")
 
                 image_map.append({
                     'mesh_id': mesh_id,

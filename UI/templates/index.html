@@ -495,41 +495,103 @@
       
       // ========== Pitch用画像生成関数 ==========
       function generatePitchFace(angle) {
+        // angle: -20 (床を向く/下) ... 0 (正面) ... +20 (天井を向く/上)
         const canvas = document.createElement('canvas');
         canvas.width = 80;
         canvas.height = 80;
         const ctx = canvas.getContext('2d');
 
-        // 背景色
-        ctx.fillStyle = '#f0e4d7'; // 肌色
+        // 背景（柔らかいグラデーションで写真風に）
+        const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        g.addColorStop(0, '#f7efe6');
+        g.addColorStop(1, '#efe1ce');
+        ctx.fillStyle = g;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // 顔の輪郭
+        // 顔の輪郭（光の当たりを追加して写真っぽく）
+        const faceX = 40, faceY = 40, faceR = 28;
+        const rg = ctx.createRadialGradient(faceX - 6, faceY - 8, 6, faceX, faceY, faceR);
+        rg.addColorStop(0, '#fff1e0');
+        rg.addColorStop(0.5, '#ffe5c9');
+        rg.addColorStop(1, '#f1cfa8');
         ctx.beginPath();
-        ctx.arc(40, 40, 30, 0, Math.PI * 2, true);
-        ctx.fillStyle = '#ffe0bd';
+        ctx.arc(faceX, faceY, faceR, 0, Math.PI * 2);
+        ctx.fillStyle = rg;
         ctx.fill();
 
-        // 目の描画
-        const eyeY = 40 + angle * 0.5; // 角度に応じて目の位置を調整
+        // 軽い影
         ctx.beginPath();
-        ctx.arc(30, eyeY, 5, 0, Math.PI * 2, true); // 左目
-        ctx.fillStyle = '#000';
+        ctx.ellipse(faceX, faceY + 18, faceR * 0.9, 8, 0, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0,0,0,0.04)';
         ctx.fill();
 
+        // 鼻（立体感）
         ctx.beginPath();
-        ctx.arc(50, eyeY, 5, 0, Math.PI * 2, true); // 右目
-        ctx.fillStyle = '#000';
-        ctx.fill();
-
-        // 口の描画
-        const mouthY = 50 + angle * 0.3; // 角度に応じて口の位置を調整
-        ctx.beginPath();
-        ctx.arc(40, mouthY, 10, 0, Math.PI, angle > 0); // 上向きか下向きかで口の形を変える
-        ctx.strokeStyle = '#000';
+        ctx.moveTo(40, 36);
+        ctx.quadraticCurveTo(39, 44, 40, 48);
+        ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+        ctx.lineWidth = 1;
         ctx.stroke();
 
-        return canvas.toDataURL();
+        // 目の描画（写真風: 白目->虹彩->瞳）
+        // 角度が正（上向き）なら目はキャンバス上側へ移動、負（下向き）なら下へ移動
+        const eyeShift = (angle / 20) * 12; // -20 -> -12 (下に), +20 -> +12 (上に)。注意: canvas座標では上が小さい値
+        // 私達の定義: angle>0 => 天井を見る => 目は上へ(小さいY)。なので eyeY = baseY - eyeShift
+        const baseEyeY = 34;
+        const leftEyeX = 28, rightEyeX = 52;
+        const eyeY = baseEyeY - eyeShift;
+
+        // 目の開き（下向き時は少し閉じ気味にする）
+        const openness = Math.max(0.25, 1 - (Math.abs(angle) / 20) * 0.45);
+
+        function drawEye(cx, cy, open) {
+          // 白目
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, 8, 6 * open, 0, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
+          // 虹彩
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, 4, 4 * open, 0, 0, Math.PI * 2);
+          ctx.fillStyle = '#5b6b7a';
+          ctx.fill();
+          // 瞳
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, 2, 2 * open, 0, 0, Math.PI * 2);
+          ctx.fillStyle = '#000000';
+          ctx.fill();
+          // 瞼の影（上から被せる）
+          if (open < 1) {
+            ctx.beginPath();
+            ctx.fillStyle = 'rgba(243,225,205,1)';
+            // 上瞼で一部覆う
+            ctx.rect(cx - 9, cy - 6, 18, 6 - (6 * open));
+            ctx.fill();
+          }
+        }
+
+        drawEye(leftEyeX, eyeY, openness);
+        drawEye(rightEyeX, eyeY, openness);
+
+        // 口の描画（曲線で上向き/下向きを表現）
+        const mouthBaseY = 52 - (angle / 20) * 6; // 上向きなら少し上へ
+        const curve = (angle / 20) * 6 * -1; // angle>0 (上向き) -> curve negative -> 上向きの弧
+        ctx.beginPath();
+        ctx.moveTo(30, mouthBaseY);
+        ctx.quadraticCurveTo(40, mouthBaseY + curve, 50, mouthBaseY);
+        ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+
+        // 軽い肌のテクスチャ（ランダムノイズを薄く描画して写真風に見せる）
+        for (let i = 0; i < 30; i++) {
+          ctx.fillStyle = 'rgba(0,0,0,0.02)';
+          const rx = faceX + (Math.random() - 0.5) * faceR * 1.2;
+          const ry = faceY + (Math.random() - 0.5) * faceR * 1.2;
+          ctx.fillRect(rx, ry, 1, 1);
+        }
+
+        return canvas.toDataURL('image/png');
       }
       
       // ========== Yaw用画像生成関数 ==========
@@ -679,45 +741,134 @@
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 15px; margin-bottom: 30px;">
       `;
       
-      // EAR: 0.05 から 0.62 まで 20段階（目だけの異なる画像を使用）
-      const earValues = [
-        {val: 0.05, label: '0.05', desc: '完全に閉じている', color: '#D32F2F', emoji: '😴'},
-        {val: 0.08, label: '0.08', desc: '', color: '#E53935', emoji: '😴'},
-        {val: 0.11, label: '0.11', desc: '', color: '#F44336', emoji: '😴'},
-        {val: 0.14, label: '0.14', desc: '', color: '#E64A19', emoji: '😑'},
-        {val: 0.17, label: '0.17', desc: '閉じ気味', color: '#FF6F00', emoji: '😑'},
-        {val: 0.20, label: '0.20', desc: '', color: '#FF8F00', emoji: '😑'},
-        {val: 0.23, label: '0.23', desc: '', color: '#FFA000', emoji: '😐'},
-        {val: 0.26, label: '0.26', desc: '', color: '#FFB300', emoji: '😐'},
-        {val: 0.29, label: '0.29', desc: '開いている', color: '#FBC02D', emoji: '😊'},
-        {val: 0.32, label: '0.32', desc: '', color: '#F9A825', emoji: '😊'},
-        {val: 0.35, label: '0.35', desc: '', color: '#8BC34A', emoji: '😊'},
-        {val: 0.38, label: '0.38', desc: '開いている', color: '#7CB342', emoji: '😊'},
-        {val: 0.41, label: '0.41', desc: '', color: '#689F38', emoji: '😃'},
-        {val: 0.44, label: '0.44', desc: '', color: '#558B2F', emoji: '😃'},
-        {val: 0.47, label: '0.47', desc: '', color: '#33691E', emoji: '😃'},
-        {val: 0.50, label: '0.50', desc: '', color: '#1B5E20', emoji: '😃'},
-        {val: 0.53, label: '0.53', desc: '', color: '#004D40', emoji: '😁'},
-        {val: 0.56, label: '0.56', desc: '', color: '#00695C', emoji: '😁'},
-        {val: 0.59, label: '0.59', desc: '', color: '#00796B', emoji: '😁'},
-        {val: 0.62, label: '0.62', desc: '非常に開いている', color: '#00897B', emoji: '😁'}
-      ];
+      // ========== EAR用画像生成関数 ==========
+      function generateEARFace(earValue) {
+        // earValue: 0 (完全に閉じている) ... 0.62 (最大で開いている)
+        // 目だけで開き具合を表現
+        const canvas = document.createElement('canvas');
+        canvas.width = 80;
+        canvas.height = 80;
+        const ctx = canvas.getContext('2d');
+
+        // 背景
+        const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        g.addColorStop(0, '#f7efe6');
+        g.addColorStop(1, '#efe1ce');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 顔の輪郭
+        const faceX = 40, faceY = 40, faceR = 28;
+        const rg = ctx.createRadialGradient(faceX - 6, faceY - 8, 6, faceX, faceY, faceR);
+        rg.addColorStop(0, '#fff1e0');
+        rg.addColorStop(0.5, '#ffe5c9');
+        rg.addColorStop(1, '#f1cfa8');
+        ctx.beginPath();
+        ctx.arc(faceX, faceY, faceR, 0, Math.PI * 2);
+        ctx.fillStyle = rg;
+        ctx.fill();
+
+        // EAR値に対応した目の開き具合（0-0.62の範囲を0-1に正規化）
+        const openness = Math.max(0, Math.min(1, earValue / 0.62));
+        
+        // 左目と右目を描画
+        const leftEyeX = 28, rightEyeX = 52, eyeY = 35;
+        
+        function drawEye(cx, cy, open) {
+          // 白目（アーモンド型）
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, 10, 6 * open, 0, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
+          
+          // 虹彩（濃い灰色）
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, 5, 4 * open, 0, 0, Math.PI * 2);
+          ctx.fillStyle = '#5b6b7a';
+          ctx.fill();
+          
+          // 瞳（黒）
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, 2.5, 2 * open, 0, 0, Math.PI * 2);
+          ctx.fillStyle = '#000000';
+          ctx.fill();
+          
+          // 目の上の瞼（開き具合に応じて）
+          if (open < 1) {
+            ctx.beginPath();
+            ctx.fillStyle = 'rgba(243,225,205,1)';
+            ctx.rect(cx - 11, cy - 6, 22, 6 - (6 * open));
+            ctx.fill();
+          }
+          
+          // 目の下の瞼（少し）
+          if (open < 0.8) {
+            ctx.beginPath();
+            ctx.fillStyle = 'rgba(200,180,160,0.3)';
+            ctx.rect(cx - 11, cy + (6 * open), 22, 2);
+            ctx.fill();
+          }
+          
+          // 瞼の輪郭線（黒）
+          ctx.beginPath();
+          ctx.moveTo(cx - 11, cy - 6);
+          ctx.lineTo(cx + 11, cy - 6);
+          ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+        }
+        
+        drawEye(leftEyeX, eyeY, openness);
+        drawEye(rightEyeX, eyeY, openness);
+        
+        // 鼻（簡単な線）
+        ctx.beginPath();
+        ctx.moveTo(40, 36);
+        ctx.quadraticCurveTo(39, 44, 40, 50);
+        ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        
+        return canvas.toDataURL('image/png');
+      }
       
-      earValues.forEach((e, idx) => {
-        // 目の開き具合を絵文字で表現（各段階で異なる絵文字）
-        const eyeEmojis = ['😴', '😴', '😴', '😑', '😑', '😑', '😐', '😐', '😊', '😊', '😊', '😊', '😃', '😃', '😃', '😃', '😁', '😁', '😁', '😁'];
-        const emoji = eyeEmojis[idx];
+      // EAR: 0 から 0.62 まで 20段階
+      const earValuesNew = [];
+      for (let i = 0; i < 20; i++) {
+        const val = (i / 19) * 0.62; // 0 から 0.62 まで均等分割
+        const colorValue = Math.round((i / 19) * 100);
+        let color = '#D32F2F'; // 赤（閉じた）
+        if (colorValue < 25) color = '#F44336';
+        else if (colorValue < 40) color = '#FF6F00';
+        else if (colorValue < 55) color = '#FFB300';
+        else if (colorValue < 70) color = '#8BC34A';
+        else color = '#00897B'; // 緑（開いた）
+        
+        let desc = '';
+        if (i === 0) desc = '完全に閉じている';
+        else if (i === 19) desc = '完全に開いている';
+        
+        earValuesNew.push({
+          val: parseFloat(val.toFixed(3)),
+          label: val.toFixed(2),
+          desc: desc,
+          color: color
+        });
+      }
+      
+      earValuesNew.forEach((e, idx) => {
+        const imgSrc = generateEARFace(e.val);
         
         html += `
           <div style="text-align: center;">
-            <div style="width: 70px; height: 70px; border-radius: 50%; border: 3px solid ${e.color}; object-fit: cover; display: flex; align-items: center; justify-content: center; margin: 0 auto; background-color: #f0f0f0; font-size: 40px;">
-              ${emoji}
-            </div>
+            <img src="${imgSrc}" alt="EAR ${e.val}" 
+                 style="width: 70px; height: 70px; border-radius: 50%; border: 3px solid ${e.color}; object-fit: cover;">
             <p style="margin: 8px 0 2px 0; font-weight: bold; color: ${e.color}; font-size: 13px;">${e.label}</p>
             <p style="margin: 0; font-size: 11px; color: #999;">${e.desc}</p>
           </div>
         `;
       });
+
       
       html += '</div></div>';
       

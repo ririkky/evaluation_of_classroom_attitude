@@ -395,9 +395,9 @@ def detect(save_img=False):
                                                 cv2.putText(vis_roi, f"EAR: {ear:.3f}", (10, 90), 
                                                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
                                                 
-                                                # 可視化画像を保存
+                                                # 可視化画像を保存（face_output_dir と同じ場所に保存）
                                                 vis_filename = f"landmarks_{face_filename}"
-                                                vis_path = save_dir / 'faces' / vis_filename
+                                                vis_path = face_output_dir / vis_filename
                                                 cv2.imwrite(str(vis_path), vis_roi)
                                                 print(f"  → Landmarks visualization saved: {vis_filename}")
                                             except Exception as e_vis:
