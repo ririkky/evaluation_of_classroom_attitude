@@ -4,32 +4,44 @@ from flask import Flask, render_template, jsonify, send_from_directory
 
 app = Flask(__name__)
 
-def load_results_from_csv():
-    base_dir = os.path.join(app.root_path, 'output')
-    csv_path = os.path.join(base_dir, 'file', 'results.csv')
-    images_dir = os.path.join(base_dir, 'images')
+# === ★ここを修正（隣のフォルダを見に行く設定） ===
+# 現在の app3.py のあるフォルダの一つ上(..)の、detect_yolo/images を指すようにする
+BASE_DIR = os.path.dirname(os.path.abspath(__file__)) # UIフォルダ
+DETECT_DIR = os.path.join(BASE_DIR, '..', 'detect_yolo') # detect_yoloフォルダ
+BASE_OUTPUT_DIR = os.path.join(DETECT_DIR, 'images') # detect_yolo/images
 
+CSV_PATH = os.path.join(BASE_OUTPUT_DIR, 'results.csv')
+FACES_DIR = os.path.join(BASE_OUTPUT_DIR, 'faces')
+# ============================================
+
+def load_results_from_csv():
     image_map = []
 
     try:
-        with open(csv_path, mode='r', encoding='utf-8-sig') as file:
+        # detect.pyが出力したCSVを読み込む
+        with open(CSV_PATH, mode='r', encoding='utf-8') as file:
             reader = csv.DictReader(file)
 
             for row in reader:
                 mesh_id      = row.get('メッシュID', '').strip()
-                path_value   = row.get('パス', '').strip()
+                path_value   = row.get('パス', '').strip() # ここにはファイル名が入っている想定
                 total_score  = row.get('総合スコア', '').strip()
                 pitch_score  = row.get('Pitchスコア', '').strip()
                 yaw_score    = row.get('Yawスコア', '').strip()
                 ear_score    = row.get('EARスコア', '').strip()
 
+                # パスが絶対パスや重複パスになっていないか考慮し、ファイル名だけ抽出
                 filename = os.path.basename(path_value)
-                image_path = os.path.join(images_dir, filename)
+                
+                # 実際の画像ファイルの場所を確認
+                image_path = os.path.join(FACES_DIR, filename)
+                
                 if not os.path.exists(image_path):
-                    print(f"⚠️ 画像が見つかりません: {image_path}")
+                    # 画像がない場合はスキップ（またはデバッグ表示）
                     continue
 
-                image_url = f"/images/{filename}"
+                # ブラウザ用URL (Flaskのルート経由)
+                image_url = f"/images/faces/{filename}"
 
                 image_map.append({
                     'mesh_id': mesh_id,
@@ -42,7 +54,7 @@ def load_results_from_csv():
                 })
 
     except FileNotFoundError:
-        print(f"⚠️ {csv_path} が見つかりません。")
+        print(f"⚠️ {CSV_PATH} が見つかりません。検出を実行しましたか？")
     except Exception as e:
         print(f"⚠️ CSV読み込みエラー: {e}")
 
@@ -61,10 +73,10 @@ def get_images():
     return jsonify(image_data)
 
 
-@app.route('/images/<path:filename>')
-def serve_images(filename):
-    images_dir = os.path.join(app.root_path, 'output', 'images')
-    return send_from_directory(images_dir, filename)
+# ★修正: 画像ファイルを提供するためのルート
+@app.route('/images/faces/<path:filename>')
+def serve_faces(filename):
+    return send_from_directory(FACES_DIR, filename)
 
 
 if __name__ == '__main__':
