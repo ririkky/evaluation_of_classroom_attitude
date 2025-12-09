@@ -212,9 +212,18 @@ def detect_frame():
     try:
         data = request.get_json()
         image_data = data.get('image_data', '')
+        frame_number = data.get('frame_number', 0)  # フレーム番号を取得
 
         if not image_data:
             return jsonify({'success': False, 'error': 'image_dataが必要です'}), 400
+
+        # 最初のフレーム（frame_number == 0）の場合、CSVを初期化
+        if frame_number == 0:
+            csv_header = ["メッシュID", "パス", "総合スコア", "Pitchスコア", "Yawスコア", "EARスコア", "Pitch角度(度)", "Yaw角度(度)", "EAR値", "ランドマーク画像"]
+            with open(CSV_PATH, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow(csv_header)
+            print(f"✅ CSV初期化: {CSV_PATH}")
 
         # Base64 画像データをファイルに保存
         import base64
@@ -222,21 +231,24 @@ def detect_frame():
             image_data = image_data.split(',')[1]
 
         frame_bytes = base64.b64decode(image_data)
-        frame_path = os.path.join(TEMP_INPUT_DIR, 'temp_frame.jpg')
+        frame_filename = f'frame_{frame_number}.jpg'
+        frame_path = os.path.join(TEMP_INPUT_DIR, frame_filename)
         
         with open(frame_path, 'wb') as f:
             f.write(frame_bytes)
 
         # detect.py を実行（フレーム処理用）
+        # --append-csv オプションを追加して追記モードで実行
         detect_cmd = [
             sys.executable, "detect.py",
             "--weights", "yolov7.pt",
             "--conf", "0.25",
             "--img-size", "640",
-            "--source", "temp_input/temp_frame.jpg",
+            "--source", f"temp_input/{frame_filename}",
             "--class", "0",
             "--save-txt",
-            "--save-faces"
+            "--save-faces",
+            "--append-csv"  # 追記モード
         ]
 
         result = subprocess.run(
@@ -248,9 +260,10 @@ def detect_frame():
         )
 
         if result.returncode != 0:
+            print(f"❌ detect.py エラー: {result.stderr}")
             return jsonify({'success': False, 'error': 'detect.py実行エラー'}), 500
 
-        # CSVから検出結果を読み込む
+        # CSVから検出結果を読み込む（最後の行を取得）
         if os.path.exists(CSV_PATH):
             with open(CSV_PATH, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
@@ -269,6 +282,7 @@ def detect_frame():
                     })
 
         return jsonify({
+            'success': True,
             'pitch_score': '0',
             'yaw_score': '0',
             'ear_score': '0'

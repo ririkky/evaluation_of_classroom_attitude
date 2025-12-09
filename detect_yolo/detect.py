@@ -126,13 +126,14 @@ def detect(save_img=False):
     # --- ★追加: CSVファイルを初期化 (ヘッダー書き込み) ---
     csv_header = ["メッシュID", "パス", "総合スコア", "Pitchスコア", "Yawスコア", "EARスコア", "Pitch角度(度)", "Yaw角度(度)", "EAR値", "ランドマーク画像"]
     # 'w' (write)モードでファイルを開き、ヘッダーを書き込む
-    # 実行のたびに上書きされます
-    try:
-        with open(csv_file_path, 'w', newline='', encoding='utf-8') as f_csv:
-            writer = csv.writer(f_csv)
-            writer.writerow(csv_header)
-    except Exception as e:
-        print(f"Error initializing CSV file {csv_file_path}: {e}")
+    # 実行のたびに上書きされます（--append-csv オプションがない場合）
+    if not opt.append_csv:
+        try:
+            with open(csv_file_path, 'w', newline='', encoding='utf-8') as f_csv:
+                writer = csv.writer(f_csv)
+                writer.writerow(csv_header)
+        except Exception as e:
+            print(f"Error initializing CSV file {csv_file_path}: {e}")
     # ----------------------------------------------------
 
 
@@ -513,6 +514,7 @@ if __name__ == '__main__':
     # --- ★追加: 顔画像の保存を制御する引数 ---
     # ★ (この引数がCSV保存も兼ねます)
     parser.add_argument('--save-faces', action='store_true', help='save detected face images and CSV results by Face ID')
+    parser.add_argument('--append-csv', action='store_true', help='append to existing CSV instead of overwriting')
     # ----------------------------------------
     opt = parser.parse_args()
     print(opt)

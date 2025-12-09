@@ -1556,7 +1556,10 @@
             fetch('/api/detect_frame', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ image_data: imageData })
+              body: JSON.stringify({ 
+                image_data: imageData,
+                frame_number: frameCount  // フレーム番号を送信
+              })
             })
             .then(response => response.json())
             .then(data => {
