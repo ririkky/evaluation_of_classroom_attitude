@@ -1523,7 +1523,7 @@
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
 
-        const fps = 10; // 0.1秒ごと = 10フレPS
+        const fps = 1; // 0.1秒ごと = 10フレPS
         const frameDuration = 1000 / fps; // ms単位
         const totalFrames = Math.ceil(video.duration * fps);
         let frameCount = 0;
@@ -1731,8 +1731,8 @@
       // グリッドライン
       ctx.strokeStyle = '#e0e0e0';
       ctx.lineWidth = 1;
-      for (let i = 0; i <= 30; i += 5) {
-        const y = padding + graphHeight - (graphHeight * i) / 30;
+      for (let i = 0; i <= 100; i += 10) {
+        const y = padding + graphHeight - (graphHeight * i) / 100;
         ctx.beginPath();
         ctx.moveTo(padding, y);
         ctx.lineTo(width - padding, y);
@@ -1770,7 +1770,7 @@
       ctx.translate(20, height / 2);
       ctx.rotate(-Math.PI / 2);
       ctx.textAlign = 'center';
-      ctx.fillText('スコア (0-30)', 0, 0);
+      ctx.fillText('スコア (0-100)', 0, 0);
       ctx.restore();
 
       // データを描画
@@ -1789,6 +1789,7 @@
         ear: '#4CAF50'
       };
 
+      // 線を描画する関数
       const drawLine = (scores, color, label) => {
         ctx.strokeStyle = color;
         ctx.lineWidth = 2.5;
@@ -1796,7 +1797,7 @@
 
         videoScores.forEach((data, index) => {
           const x = padding + (graphWidth * index) / (videoScores.length - 1 || 1);
-          const y = padding + graphHeight - (graphHeight * scores[index]) / 30;
+          const y = padding + graphHeight - (graphHeight * scores[index]) / 100;
 
           if (index === 0) {
             ctx.moveTo(x, y);
@@ -1810,7 +1811,7 @@
         ctx.fillStyle = color;
         videoScores.forEach((data, index) => {
           const x = padding + (graphWidth * index) / (videoScores.length - 1 || 1);
-          const y = padding + graphHeight - (graphHeight * scores[index]) / 30;
+          const y = padding + graphHeight - (graphHeight * scores[index]) / 100;
           ctx.beginPath();
           ctx.arc(x, y, 4, 0, Math.PI * 2);
           ctx.fill();
@@ -1822,16 +1823,20 @@
       drawLine(videoScores.map(d => d.yawScore), colors.yaw, 'Yaw');
       drawLine(videoScores.map(d => d.earScore), colors.ear, 'EAR');
 
+      // 総合スコアの計算と描画
+      const avgPitch = (videoScores.reduce((a, b) => a + b.pitchScore, 0) / videoScores.length).toFixed(1);
+      const avgYaw = (videoScores.reduce((a, b) => a + b.yawScore, 0) / videoScores.length).toFixed(1);
+      const avgEAR = (videoScores.reduce((a, b) => a + b.earScore, 0) / videoScores.length).toFixed(1);
+      const avgTotal = (videoScores.reduce((a, b) => a + b.totalScore, 0) / videoScores.length).toFixed(1);
+      colors.total = '#9C27B0'; // Total score color
+
+      drawLine(videoScores.map(d => d.totalScore), colors.total, 'Total');
+
       // 凡例と平均値を表示
       const legendX = width - 220;
       const legendY = padding + 20;
       ctx.font = '12px Arial';
       
-      // 平均値計算
-      const avgPitch = (videoScores.reduce((a, b) => a + b.pitchScore, 0) / videoScores.length).toFixed(1);
-      const avgYaw = (videoScores.reduce((a, b) => a + b.yawScore, 0) / videoScores.length).toFixed(1);
-      const avgEAR = (videoScores.reduce((a, b) => a + b.earScore, 0) / videoScores.length).toFixed(1);
-
       Object.entries(colors).forEach(([key, color], i) => {
         ctx.fillStyle = color;
         ctx.fillRect(legendX, legendY + i * 25, 12, 12);
@@ -1846,9 +1851,12 @@
         } else if (key === 'yaw') {
           label = 'Yaw';
           avgValue = avgYaw;
-        } else {
+        } else if (key === 'ear') {
           label = 'EAR';
           avgValue = avgEAR;
+        } else if (key === 'total') {
+          label = 'Total';
+          avgValue = avgTotal;
         }
         
         ctx.fillText(`${label}: ${avgValue}`, legendX + 16, legendY + i * 25 + 10);
