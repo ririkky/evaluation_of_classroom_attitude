@@ -49,7 +49,9 @@ def load_results_from_csv():
                 image_path = os.path.join(FACES_DIR, filename)
                 
                 if not os.path.exists(image_path):
-                    # 画像がない場合はスキップ（またはデバッグ表示）
+                    # 画像がない場合はデバッグ表示してスキップ（顔が検出されなかったフレーム）
+                    print(f"⚠️ Image file not found (face not detected): {image_path}")
+                    print(f"  CSV row: mesh_id={mesh_id}, filename={filename}")
                     continue
 
                 # ブラウザ用URL (Flaskのルート経由)
@@ -263,14 +265,19 @@ def detect_frame():
             print(f"❌ detect.py エラー: {result.stderr}")
             return jsonify({'success': False, 'error': 'detect.py実行エラー'}), 500
 
+        print(f"✅ Frame {frame_number} 処理完了")
+
         # CSVから検出結果を読み込む（最後の行を取得）
         if os.path.exists(CSV_PATH):
             with open(CSV_PATH, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 rows = list(reader)
                 
+                print(f"📊 CSV行数: {len(rows)}, フレーム番号: {frame_number}")
+                
                 if rows:
                     last_row = rows[-1]
+                    print(f"  最終行データ: mesh_id={last_row.get('メッシュID')}, path={last_row.get('パス')}")
                     return jsonify({
                         'success': True,
                         'pitch_score': last_row.get('Pitchスコア', '0'),
@@ -280,6 +287,8 @@ def detect_frame():
                         'yaw_angle': last_row.get('Yaw角度(度)', '0'),
                         'ear_value': last_row.get('EAR値', '0')
                     })
+                else:
+                    print(f"⚠️ CSVに行がありません（フレーム {frame_number}）")
 
         return jsonify({
             'success': True,
@@ -332,6 +341,8 @@ def get_video_frames():
     try:
         # CSVから結果を読み込む
         results = load_results_from_csv()
+        
+        print(f"📊 /api/video_frames: CSVから読み込んだ結果数: {len(results)}")
         
         # フレームデータを構築
         frame_data = []

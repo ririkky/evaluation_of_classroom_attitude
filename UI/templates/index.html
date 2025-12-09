@@ -1578,6 +1578,26 @@
                 console.log('Missing score data in response');
               }
 
+              // フレームカウントを先に増やす
+              frameCount++;
+              
+              // プログレスバー更新（現在のフレーム数 / 総フレーム数）
+              const progress = Math.round((frameCount / totalFrames) * 100);
+              const progressBar = document.getElementById('videoProgressBar');
+              progressBar.style.width = progress + '%';
+              progressBar.textContent = progress + '%';
+              
+              const frameCountDiv = document.getElementById('videoFrameCount');
+              frameCountDiv.textContent = `フレーム数: ${frameCount} / ${totalFrames}`;
+
+              processFrame();
+            })
+            .catch(err => {
+              console.error('フレーム処理エラー:', err);
+              
+              // エラー時もフレームカウントを増やす
+              frameCount++;
+              
               // プログレスバー更新
               const progress = Math.round((frameCount / totalFrames) * 100);
               const progressBar = document.getElementById('videoProgressBar');
@@ -1585,14 +1605,8 @@
               progressBar.textContent = progress + '%';
               
               const frameCountDiv = document.getElementById('videoFrameCount');
-              frameCountDiv.textContent = `フレーム数: ${frameCount + 1} / ${totalFrames}`;
-
-              frameCount++;
-              processFrame();
-            })
-            .catch(err => {
-              console.error('フレーム処理エラー:', err);
-              frameCount++;
+              frameCountDiv.textContent = `フレーム数: ${frameCount} / ${totalFrames}`;
+              
               processFrame();
             });
           }, 100); // フレーム読み込み待機
