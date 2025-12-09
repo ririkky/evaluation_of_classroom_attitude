@@ -285,6 +285,46 @@
       display: block;
     }
 
+    /* ========== サブタブ関連のスタイル ========== */
+    .sub-tab-buttons {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #ddd;
+    }
+
+    .sub-tab-btn {
+      padding: 10px 16px;
+      background-color: #f5f5f5;
+      color: #333;
+      border: none;
+      border-radius: 4px 4px 0 0;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.3s;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+    }
+
+    .sub-tab-btn:hover {
+      background-color: #efefef;
+    }
+
+    .sub-tab-btn.active {
+      background-color: white;
+      color: #1976d2;
+      border-bottom-color: #1976d2;
+    }
+
+    .sub-tab-content {
+      display: none;
+    }
+
+    .sub-tab-content.active {
+      display: block;
+    }
+
     #videoInput {
       padding: 10px;
       margin-right: 10px;
@@ -416,13 +456,13 @@
       </div>
 
       <!-- タブボタン -->
-      <div class="tab-buttons">
-        <button class="tab-btn active" data-tab="video-graph-tab">📊 グラフ表示</button>
-        <button class="tab-btn" data-tab="video-photos-tab">🖼️ 写真表示</button>
+      <div class="sub-tab-buttons">
+        <button class="sub-tab-btn active" data-tab="video-graph-tab">📊 グラフ表示</button>
+        <button class="sub-tab-btn" data-tab="video-photos-tab">🖼️ 写真表示</button>
       </div>
 
       <!-- グラフ表示タブ -->
-      <div id="video-graph-tab" class="tab-content active" style="display: block;">
+      <div id="video-graph-tab" class="sub-tab-content active" style="display: block;">
         <h2>📊 グラフ表示</h2>
         <div id="videoGraphDiv" style="margin-top: 30px;">
           <h3>評価スコアの推移</h3>
@@ -431,7 +471,7 @@
       </div>
 
       <!-- 写真表示タブ -->
-      <div id="video-photos-tab" class="tab-content" style="display: none;">
+      <div id="video-photos-tab" class="sub-tab-content" style="display: none;">
         <h2>🖼️ 写真表示</h2>
         <div id="videoPhotosContainer" style="display: grid; grid-template-columns: 1fr; gap: 15px;">
           <!-- 各フレームのメッシュ画像と評価値がここに表示されます -->
@@ -1293,7 +1333,7 @@
               <li><strong>#133, #153</strong>: 下まぶたの2点</li>
               <li><strong>#144</strong>: 目尻（右端）</li>
             </ul>
-            <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">→ これらの点で<strong>目の縦幅と横幅</strong>を測定</p>
+            <p style="margin:  10px 0 0; font-size: 14px; color: #666;">→ これらの点で<strong>目の縦幅と横幅</strong>を測定</p>
           </div>
           
           <div style="background-color: #fff3e0; padding: 15px; border-left: 4px solid #FF9800; margin: 10px 0;">
@@ -1382,9 +1422,49 @@
       });
     });
 
+    // ========== サブタブ切り替え機能 ==========
+    document.querySelectorAll('.sub-tab-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const tabName = this.getAttribute('data-tab');
+        console.log('Sub-tab button clicked:', tabName);
+        
+        // すべてのサブタブコンテンツを非表示にする
+        document.querySelectorAll('.sub-tab-content').forEach(content => {
+          content.style.display = 'none';
+          content.classList.remove('active');
+        });
+        
+        // すべてのサブタブボタンをアクティブから外す
+        document.querySelectorAll('.sub-tab-btn').forEach(b => {
+          b.classList.remove('active');
+        });
+        
+        // クリックされたサブタブをアクティブにする
+        const tabElement = document.getElementById(tabName);
+        if (tabElement) {
+          tabElement.style.display = 'block';
+          tabElement.classList.add('active');
+        }
+        this.classList.add('active');
+
+        // グラフタブが表示された場合、グラフを再描画
+        if (tabName === 'video-graph-tab') {
+          setTimeout(drawScoreGraph, 100);
+        }
+        // 写真タブが表示された場合、写真を再表示（必要なら）
+        if (tabName === 'video-photos-tab') {
+          displayVideoPhotos();
+        }
+      });
+    });
+    
     // ビデオタブ内のサブタブ切り替え関数
     function switchVideoTab(tabId) {
       console.log('Switching to tab:', tabId);
+      console.log('All video tabs:', allVideoTabs);
+      console.log('All video buttons:', allVideoBtns);
+      console.log('Tab element to activate:', tabElement);
+      console.log('Button to activate:', btn);
       
       // すべてのビデオサブタブを非表示にする
       const allVideoTabs = document.querySelectorAll('#video-tab .tab-content');
@@ -1535,14 +1615,14 @@
       const graphBtn = document.querySelector('button[data-tab="video-graph-tab"]');
       const photoBtn = document.querySelector('button[data-tab="video-photos-tab"]');
       
-      // すべてのタブを非表示にする
-      document.querySelectorAll('#video-tab .tab-content').forEach(tab => {
+      // すべてのサブタブを非表示にする
+      document.querySelectorAll('.sub-tab-content').forEach(tab => {
         tab.style.display = 'none';
         tab.classList.remove('active');
       });
       
-      // すべてのボタンをアクティブから外す
-      document.querySelectorAll('#video-tab .tab-btn').forEach(btn => {
+      // すべてのサブボタンをアクティブから外す
+      document.querySelectorAll('.sub-tab-btn').forEach(btn => {
         btn.classList.remove('active');
       });
       
@@ -1566,6 +1646,7 @@
     }
 
     function displayVideoPhotos() {
+      console.log('displayVideoPhotos called');
       // フレームデータを取得して表示
       fetch('/api/video_frames')
         .then(response => {
@@ -1629,6 +1710,7 @@
     }
 
     function drawScoreGraph() {
+      console.log('drawScoreGraph called');
       const canvas = document.getElementById('scoreGraph');
       if (!canvas) {
         console.error('キャンバス要素が見つかりません');
