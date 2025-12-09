@@ -285,6 +285,60 @@ def serve_faces(filename):
     return send_from_directory(FACES_DIR, filename)
 
 
+@app.route('/api/mesh_images', methods=['GET'])
+def get_mesh_images():
+    """
+    メッシュ画像を取得するエンドポイント
+    """
+    try:
+        # メッシュ画像ディレクトリを確認
+        if not os.path.exists(FACES_DIR):
+            return jsonify({"error": "メッシュ画像ディレクトリが存在しません。"}), 404
+
+        # メッシュ画像を取得
+        mesh_images = []
+        for filename in os.listdir(FACES_DIR):
+            if filename.endswith(('.png', '.jpg', '.jpeg')):
+                image_url = f"/images/faces/{filename}"
+                mesh_images.append({"filename": filename, "url": image_url})
+
+        return jsonify({"mesh_images": mesh_images})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# 新規追加: 動画の各フレームのメッシュ画像と評価値を取得するエンドポイント
+@app.route('/api/video_frames', methods=['GET'])
+def get_video_frames():
+    """
+    動画の各フレームのメッシュ画像と評価値を取得するエンドポイント
+    CSVから読み込んだデータを返す
+    """
+    try:
+        # CSVから結果を読み込む
+        results = load_results_from_csv()
+        
+        # フレームデータを構築
+        frame_data = []
+        for result in results:
+            frame_data.append({
+                "filename": result['filename'],
+                "url": result['url'],
+                "pitch_angle": result['pitch_angle'],      # 角度（度）
+                "yaw_angle": result['yaw_angle'],          # 角度（度）
+                "ear_value": result['ear_value'],          # EAR値
+                "pitch_score": result['pitch_score'],      # スコア
+                "yaw_score": result['yaw_score'],          # スコア
+                "ear_score": result['ear_score']           # スコア
+            })
+
+        return jsonify({"frames": frame_data})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == '__main__':
     # ポート 5000 が使用中の場合は 5001 を使用
     app.run(host='127.0.0.1', port=5001, debug=True)

@@ -308,6 +308,49 @@
       background-color: #cccccc;
       cursor: not-allowed;
     }
+
+    /* ========== メッシュ画像タブのスタイル ========== */
+    #meshImageContainer img {
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    #meshImageContainer img:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+    }
+
+    /* 写真タブのレイアウト */
+    .photo-item {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background-color: #f9f9f9;
+    }
+
+    .photo-item img {
+      width: 150px;
+      height: auto;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .photo-item .evaluation {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .photo-item .evaluation span {
+      font-size: 14px;
+      color: #333;
+    }
   </style>
 </head>
 <body>
@@ -358,42 +401,40 @@
         <div class="upload-status">
           <span id="videoStatusMessage"></span>
         </div>
-      </div>
-
-      <!-- ========== 動画処理の進捗表示 ========== -->
-      <div id="videoProgressDiv" style="display: none; margin-top: 20px;">
-        <h3>処理進度</h3>
-        <div style="width: 100%; background-color: #e0e0e0; border-radius: 4px; overflow: hidden;">
-          <div id="videoProgressBar" style="height: 30px; background-color: #4CAF50; width: 0%; transition: width 0.3s; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
-            0%
-          </div>
-        </div>
-        <p id="videoFrameCount" style="margin-top: 10px; font-size: 14px;">フレーム数: 0 / 0</p>
-      </div>
-
-      <!-- ========== グラフ表示 ========== -->
-      <div id="videoGraphDiv" style="display: none; margin-top: 30px;">
-        <h3>評価スコアの推移</h3>
-        <canvas id="scoreGraph" width="1000" height="400" style="border: 1px solid #ddd; margin-bottom: 20px;"></canvas>
         
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-top: 20px;">
-          <div style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; text-align: center;">
-            <p style="margin: 0; font-size: 12px; color: #666;">平均Pitchスコア</p>
-            <p id="avgPitchScore" style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #1976d2;">0</p>
+        <!-- 進捗表示 -->
+        <div id="videoProgressDiv" style="display: none; margin-top: 20px; padding: 15px; background-color: #f5f5f5; border-radius: 8px;">
+          <div id="videoFrameCount" style="font-size: 14px; font-weight: bold; margin-bottom: 10px; color: #333;">
+            フレーム数: 0 / 0
           </div>
-          <div style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; text-align: center;">
-            <p style="margin: 0; font-size: 12px; color: #666;">平均Yawスコア</p>
-            <p id="avgYawScore" style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #1976d2;">0</p>
-          </div>
-          <div style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; text-align: center;">
-            <p style="margin: 0; font-size: 12px; color: #666;">平均EARスコア</p>
-            <p id="avgEARScore" style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #1976d2;">0</p>
+          <div style="width: 100%; height: 30px; background-color: #e0e0e0; border-radius: 15px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);">
+            <div id="videoProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #4CAF50, #81C784); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; transition: width 0.3s ease;">
+              0%
+            </div>
           </div>
         </div>
+      </div>
 
-        <div style="background-color: #f3e5f5; padding: 20px; border-radius: 8px; text-align: center; margin-top: 20px;">
-          <p style="margin: 0; font-size: 14px; color: #666;">最終スコア（平均）</p>
-          <p id="finalScore" style="margin: 10px 0 0 0; font-size: 32px; font-weight: bold; color: #7b1fa2;">0</p>
+      <!-- タブボタン -->
+      <div class="tab-buttons">
+        <button class="tab-btn active" data-tab="video-graph-tab">📊 グラフ表示</button>
+        <button class="tab-btn" data-tab="video-photos-tab">🖼️ 写真表示</button>
+      </div>
+
+      <!-- グラフ表示タブ -->
+      <div id="video-graph-tab" class="tab-content active" style="display: block;">
+        <h2>📊 グラフ表示</h2>
+        <div id="videoGraphDiv" style="margin-top: 30px;">
+          <h3>評価スコアの推移</h3>
+          <canvas id="scoreGraph" width="1000" height="400" style="border: 1px solid #ddd; margin-bottom: 20px;"></canvas>
+        </div>
+      </div>
+
+      <!-- 写真表示タブ -->
+      <div id="video-photos-tab" class="tab-content" style="display: none;">
+        <h2>🖼️ 写真表示</h2>
+        <div id="videoPhotosContainer" style="display: grid; grid-template-columns: 1fr; gap: 15px;">
+          <!-- 各フレームのメッシュ画像と評価値がここに表示されます -->
         </div>
       </div>
     </div>
@@ -467,8 +508,20 @@
         .then(data => {
           allImages = data;
           console.log('Images loaded:', allImages);
+
+          // 進捗表示の更新
+          const progressDiv = document.getElementById('progress');
+          if (progressDiv) {
+            progressDiv.innerHTML = `読み込み完了: ${allImages.length} 枚の画像`;
+          }
         })
-        .catch(error => console.error('Error loading images:', error));
+        .catch(error => {
+          console.error('Error loading images:', error);
+          const progressDiv = document.getElementById('progress');
+          if (progressDiv) {
+            progressDiv.innerHTML = '画像の読み込み中にエラーが発生しました';
+          }
+        });
     }
 
     // ========== 詳細を全て表示 ==========
@@ -1256,14 +1309,14 @@
           
           <h3 style="color: #2196F3;">📏 計算式</h3>
           <div style="background-color: #f5f5f5; padding: 15px; border-radius: 8px; font-family: monospace; text-align: center;">
-            <p style="margin: 0; font-size: 18px; font-weight: bold;">EAR = (垂直距離の平均) ÷ (水平距離)</p>
+            <p style="margin:  0; font-size: 18px; font-weight: bold;">EAR = (垂直距離の平均) ÷ (水平距離)</p>
             <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">垂直距離 = 上下のまぶた間の距離（2箇所の平均）</p>
             <p style="margin: 5px 0 0 0; font-size: 14px; color: #666;">水平距離 = 目頭から目尻までの距離</p>
           </div>
           
           <div style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; margin-top: 15px;">
             <p style="margin: 0;"><strong>💡 解釈:</strong></p>
-            <ul style="margin: 10px 0;">
+            <ul style="margin:  10px 0;">
               <li><strong>0.20以上</strong>: 目がしっかり開いている（良好な授業態度）</li>
               <li><strong>0.15〜0.20</strong>: やや目が閉じ気味（集中力低下の可能性）</li>
               <li><strong>0.15未満</strong>: 目が閉じている（居眠り、眠気の可能性が高い）</li>
@@ -1306,9 +1359,11 @@
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', function() {
         const tabName = this.getAttribute('data-tab');
+        console.log('Tab button clicked:', tabName);
         
         // すべてのタブコンテンツを非表示にする
         document.querySelectorAll('.tab-content').forEach(content => {
+          content.style.display = 'none';
           content.classList.remove('active');
         });
         
@@ -1318,10 +1373,49 @@
         });
         
         // クリックされたタブをアクティブにする
-        document.getElementById(tabName).classList.add('active');
+        const tabElement = document.getElementById(tabName);
+        if (tabElement) {
+          tabElement.style.display = 'block';
+          tabElement.classList.add('active');
+        }
         this.classList.add('active');
       });
     });
+
+    // ビデオタブ内のサブタブ切り替え関数
+    function switchVideoTab(tabId) {
+      console.log('Switching to tab:', tabId);
+      
+      // すべてのビデオサブタブを非表示にする
+      const allVideoTabs = document.querySelectorAll('#video-tab .tab-content');
+      console.log('Found video tabs:', allVideoTabs.length);
+      allVideoTabs.forEach(tab => {
+        tab.classList.remove('active');
+      });
+      
+      // すべてのビデオタブボタンをアクティブから外す
+      const allVideoBtns = document.querySelectorAll('#video-tab .tab-buttons .tab-btn');
+      console.log('Found video buttons:', allVideoBtns.length);
+      allVideoBtns.forEach(btn => {
+        btn.classList.remove('active');
+      });
+      
+      // 指定されたタブをアクティブにする
+      const tabElement = document.getElementById(tabId);
+      console.log('Tab element:', tabElement);
+      if (tabElement) {
+        tabElement.classList.add('active');
+        
+        // 対応するボタンもアクティブにする
+        const btnSelector = `#video-tab .tab-buttons .tab-btn[data-tab="${tabId}"]`;
+        const btn = document.querySelector(btnSelector);
+        console.log('Button selector:', btnSelector);
+        console.log('Button element:', btn);
+        if (btn) {
+          btn.classList.add('active');
+        }
+      }
+    }
 
     // ========== 動画処理機能 ==========
     let videoScores = [];
@@ -1349,7 +1443,7 @@
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
 
-        const fps = 10; // 0.1秒ごと = 10フPS
+        const fps = 10; // 0.1秒ごと = 10フレPS
         const frameDuration = 1000 / fps; // ms単位
         const totalFrames = Math.ceil(video.duration * fps);
         let frameCount = 0;
@@ -1386,14 +1480,19 @@
             })
             .then(response => response.json())
             .then(data => {
+              console.log('Frame response:', data);
               if (data.pitch_score && data.yaw_score && data.ear_score) {
-                videoScores.push({
+                const scoreData = {
                   frameNumber: frameCount,
                   pitchScore: parseInt(data.pitch_score),
                   yawScore: parseInt(data.yaw_score),
                   earScore: parseInt(data.ear_score),
                   totalScore: parseInt(data.pitch_score) + parseInt(data.yaw_score) + parseInt(data.ear_score)
-                });
+                };
+                videoScores.push(scoreData);
+                console.log('Added score:', scoreData, 'Total scores:', videoScores.length);
+              } else {
+                console.log('Missing score data in response');
               }
 
               // プログレスバー更新
@@ -1421,35 +1520,125 @@
     }
 
     function displayVideoResults() {
+      console.log('displayVideoResults called, videoScores.length:', videoScores.length);
+      
       if (videoScores.length === 0) {
         showVideoStatus('検出されたフレームがありません', 'error');
         return;
       }
 
-      // グラフ表示
-      document.getElementById('videoGraphDiv').style.display = 'block';
-
-      // 平均値計算
-      const avgPitchScore = (videoScores.reduce((a, b) => a + b.pitchScore, 0) / videoScores.length).toFixed(1);
-      const avgYawScore = (videoScores.reduce((a, b) => a + b.yawScore, 0) / videoScores.length).toFixed(1);
-      const avgEARScore = (videoScores.reduce((a, b) => a + b.earScore, 0) / videoScores.length).toFixed(1);
-      const finalScore = (videoScores.reduce((a, b) => a + b.totalScore, 0) / videoScores.length).toFixed(1);
-
-      document.getElementById('avgPitchScore').textContent = avgPitchScore;
-      document.getElementById('avgYawScore').textContent = avgYawScore;
-      document.getElementById('avgEARScore').textContent = avgEARScore;
-      document.getElementById('finalScore').textContent = finalScore;
-
+      console.log('videoScores:', videoScores);
+      
+      // グラフ表示タブを表示
+      const graphTab = document.getElementById('video-graph-tab');
+      const photoTab = document.getElementById('video-photos-tab');
+      const graphBtn = document.querySelector('button[data-tab="video-graph-tab"]');
+      const photoBtn = document.querySelector('button[data-tab="video-photos-tab"]');
+      
+      // すべてのタブを非表示にする
+      document.querySelectorAll('#video-tab .tab-content').forEach(tab => {
+        tab.style.display = 'none';
+        tab.classList.remove('active');
+      });
+      
+      // すべてのボタンをアクティブから外す
+      document.querySelectorAll('#video-tab .tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      
+      // グラフタブをアクティブにする
+      if (graphTab) {
+        graphTab.style.display = 'block';
+        graphTab.classList.add('active');
+      }
+      if (graphBtn) {
+        graphBtn.classList.add('active');
+      }
+      
       // グラフを描画
-      drawScoreGraph();
+      setTimeout(() => {
+        console.log('Calling drawScoreGraph()');
+        drawScoreGraph();
+        // 写真表示タブにもデータを表示
+        console.log('Calling displayVideoPhotos()');
+        displayVideoPhotos();
+      }, 100);
+    }
+
+    function displayVideoPhotos() {
+      // フレームデータを取得して表示
+      fetch('/api/video_frames')
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTPエラー: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          const videoPhotosContainer = document.getElementById('videoPhotosContainer');
+          videoPhotosContainer.innerHTML = ''; // クリア
+
+          if (data.frames && data.frames.length > 0) {
+            data.frames.forEach((frame, idx) => {
+              const frameItem = document.createElement('div');
+              frameItem.style.cssText = 'border: 1px solid #ddd; border-radius: 8px; padding: 15px; background: #f9f9f9; margin-bottom: 15px;';
+
+              // フレーム番号
+              const frameNum = document.createElement('h4');
+              frameNum.textContent = `フレーム ${idx + 1}`;
+              frameNum.style.cssText = 'margin: 0 0 10px 0; color: #333;';
+              frameItem.appendChild(frameNum);
+
+              const imgElement = document.createElement('img');
+              imgElement.src = frame.url;
+              imgElement.alt = frame.filename;
+              imgElement.style.cssText = 'width: 100%; max-width: 500px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ccc;';
+
+              const evaluationDiv = document.createElement('div');
+              evaluationDiv.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;';
+              evaluationDiv.innerHTML = `
+                <div style="padding: 12px; background: #fff3cd; border-radius: 5px; border: 1px solid #ffc107;">
+                  <strong style="font-size: 12px; color: #856404;">Pitch</strong>
+                  <p style="margin: 8px 0 0 0; font-size: 16px; font-weight: bold; color: #FF6F00;">${frame.pitch_angle || frame.pitch}</p>
+                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #856404;">角度</p>
+                </div>
+                <div style="padding: 12px; background: #d1ecf1; border-radius: 5px; border: 1px solid #17a2b8;">
+                  <strong style="font-size: 12px; color: #0c5460;">Yaw</strong>
+                  <p style="margin: 8px 0 0 0; font-size: 16px; font-weight: bold; color: #2196F3;">${frame.yaw_angle || frame.yaw}</p>
+                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #0c5460;">角度</p>
+                </div>
+                <div style="padding: 12px; background: #d4edda; border-radius: 5px; border: 1px solid #28a745;">
+                  <strong style="font-size: 12px; color: #155724;">EAR</strong>
+                  <p style="margin: 8px 0 0 0; font-size: 16px; font-weight: bold; color: #4CAF50;">${frame.ear_value || frame.ear}</p>
+                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #155724;">値</p>
+                </div>
+              `;
+
+              frameItem.appendChild(imgElement);
+              frameItem.appendChild(evaluationDiv);
+              videoPhotosContainer.appendChild(frameItem);
+            });
+          } else {
+            videoPhotosContainer.innerHTML = '<p style="color: #666;">フレームデータがありません</p>';
+          }
+        })
+        .catch(error => {
+          console.error('エラーが発生しました:', error);
+          document.getElementById('videoPhotosContainer').innerHTML = `<p style="color: red;">エラーが発生しました: ${error.message}</p>`;
+        });
     }
 
     function drawScoreGraph() {
       const canvas = document.getElementById('scoreGraph');
+      if (!canvas) {
+        console.error('キャンバス要素が見つかりません');
+        return;
+      }
+
       const ctx = canvas.getContext('2d');
       const width = canvas.width;
       const height = canvas.height;
-      const padding = 60;
+      const padding = 80;
       const graphWidth = width - padding * 2;
       const graphHeight = height - padding * 2;
 
@@ -1460,8 +1649,8 @@
       // グリッドライン
       ctx.strokeStyle = '#e0e0e0';
       ctx.lineWidth = 1;
-      for (let i = 0; i <= 100; i += 10) {
-        const y = padding + (graphHeight * (100 - i)) / 100;
+      for (let i = 0; i <= 30; i += 5) {
+        const y = padding + graphHeight - (graphHeight * i) / 30;
         ctx.beginPath();
         ctx.moveTo(padding, y);
         ctx.lineTo(width - padding, y);
@@ -1503,7 +1692,14 @@
       ctx.restore();
 
       // データを描画
-      if (videoScores.length === 0) return;
+      if (!videoScores || videoScores.length === 0) {
+        ctx.fillStyle = '#999';
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('データがありません', width / 2, height / 2);
+        return;
+      }
 
       const colors = {
         pitch: '#FF6F00',
@@ -1513,7 +1709,7 @@
 
       const drawLine = (scores, color, label) => {
         ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2.5;
         ctx.beginPath();
 
         videoScores.forEach((data, index) => {
@@ -1534,7 +1730,7 @@
           const x = padding + (graphWidth * index) / (videoScores.length - 1 || 1);
           const y = padding + graphHeight - (graphHeight * scores[index]) / 30;
           ctx.beginPath();
-          ctx.arc(x, y, 3, 0, Math.PI * 2);
+          ctx.arc(x, y, 4, 0, Math.PI * 2);
           ctx.fill();
         });
       };
@@ -1544,22 +1740,43 @@
       drawLine(videoScores.map(d => d.yawScore), colors.yaw, 'Yaw');
       drawLine(videoScores.map(d => d.earScore), colors.ear, 'EAR');
 
-      // 凡例
-      const legendX = width - 150;
+      // 凡例と平均値を表示
+      const legendX = width - 220;
       const legendY = padding + 20;
       ctx.font = '12px Arial';
       
+      // 平均値計算
+      const avgPitch = (videoScores.reduce((a, b) => a + b.pitchScore, 0) / videoScores.length).toFixed(1);
+      const avgYaw = (videoScores.reduce((a, b) => a + b.yawScore, 0) / videoScores.length).toFixed(1);
+      const avgEAR = (videoScores.reduce((a, b) => a + b.earScore, 0) / videoScores.length).toFixed(1);
+
       Object.entries(colors).forEach(([key, color], i) => {
         ctx.fillStyle = color;
-        ctx.fillRect(legendX, legendY + i * 20, 12, 12);
+        ctx.fillRect(legendX, legendY + i * 25, 12, 12);
         ctx.fillStyle = '#333';
         ctx.textAlign = 'left';
-        ctx.fillText(
-          key === 'pitch' ? 'Pitch' : key === 'yaw' ? 'Yaw' : 'EAR',
-          legendX + 16,
-          legendY + i * 20 + 10
-        );
+        
+        let label = '';
+        let avgValue = '';
+        if (key === 'pitch') {
+          label = 'Pitch';
+          avgValue = avgPitch;
+        } else if (key === 'yaw') {
+          label = 'Yaw';
+          avgValue = avgYaw;
+        } else {
+          label = 'EAR';
+          avgValue = avgEAR;
+        }
+        
+        ctx.fillText(`${label}: ${avgValue}`, legendX + 16, legendY + i * 25 + 10);
       });
+
+      // タイトル表示
+      ctx.fillStyle = '#333';
+      ctx.font = 'bold 16px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('評価スコア推移グラフ', width / 2, padding - 20);
     }
 
     function showVideoStatus(message, type) {
@@ -1570,6 +1787,63 @@
 
     // ========== 初期化 ==========
     loadImages();
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const meshImageContainer = document.getElementById('meshImageContainer');
+
+      // メッシュ画像を取得して表示
+      fetch('/api/mesh_images')
+        .then(response => response.json())
+        .then(data => {
+          if (data.mesh_images) {
+            data.mesh_images.forEach(image => {
+              const imgElement = document.createElement('img');
+              imgElement.src = image.url;
+              imgElement.alt = image.filename;
+              imgElement.title = image.filename;
+              meshImageContainer.appendChild(imgElement);
+            });
+          } else {
+            console.error('メッシュ画像が取得できませんでした:', data.error);
+          }
+        })
+        .catch(error => console.error('エラーが発生しました:', error));
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const videoPhotosContainer = document.getElementById('videoPhotosContainer');
+
+      // フレームデータを取得して表示
+      fetch('/api/video_frames')
+        .then(response => response.json())
+        .then(data => {
+          if (data.frames) {
+            data.frames.forEach(frame => {
+              const frameItem = document.createElement('div');
+              frameItem.classList.add('photo-item');
+
+              const imgElement = document.createElement('img');
+              imgElement.src = frame.url;
+              imgElement.alt = frame.filename;
+
+              const evaluationDiv = document.createElement('div');
+              evaluationDiv.classList.add('evaluation');
+              evaluationDiv.innerHTML = `
+                <span><strong>Pitch:</strong> ${frame.pitch}</span>
+                <span><strong>Yaw:</strong> ${frame.yaw}</span>
+                <span><strong>EAR:</strong> ${frame.ear}</span>
+              `;
+
+              frameItem.appendChild(imgElement);
+              frameItem.appendChild(evaluationDiv);
+              videoPhotosContainer.appendChild(frameItem);
+            });
+          } else {
+            console.error('フレームデータが取得できませんでした:', data.error);
+          }
+        })
+        .catch(error => console.error('エラーが発生しました:', error));
+    });
   </script>
 </body>
 </html>
