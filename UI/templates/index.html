@@ -1690,7 +1690,8 @@
               frameItem.appendChild(frameNum);
 
               const imgElement = document.createElement('img');
-              imgElement.src = frame.url;
+              // ランドマーク画像があればそれを使用、なければ通常の顔画像を使用
+              imgElement.src = frame.landmark_url || frame.url;
               imgElement.alt = frame.filename;
               imgElement.style.cssText = 'width: 100%; max-width: 500px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ccc;';
 

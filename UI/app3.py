@@ -350,6 +350,7 @@ def get_video_frames():
             frame_data.append({
                 "filename": result['filename'],
                 "url": result['url'],
+                "landmark_url": result.get('landmark_url', ''),  # ランドマーク画像URL
                 "pitch_angle": result['pitch_angle'],      # 角度（度）
                 "yaw_angle": result['yaw_angle'],          # 角度（度）
                 "ear_value": result['ear_value'],          # EAR値
