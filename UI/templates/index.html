@@ -1523,7 +1523,7 @@
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
 
-        const fps = 1; // 0.1秒ごと = 10フレPS
+        const fps = 10; // 0.1秒ごと = 10フレPS
         const frameDuration = 1000 / fps; // ms単位
         const totalFrames = Math.ceil(video.duration * fps);
         let frameCount = 0;
@@ -1697,18 +1697,18 @@
               evaluationDiv.innerHTML = `
                 <div style="padding: 12px; background: #fff3cd; border-radius: 5px; border: 1px solid #ffc107;">
                   <strong style="font-size: 12px; color: #856404;">Pitch</strong>
-                  <p style="margin: 8px 0 0 0; font-size: 16px; font-weight: bold; color: #FF6F00;">${frame.pitch_angle || frame.pitch}</p>
-                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #856404;">角度</p>
+                  <p style="margin: 8px 0 4px 0; font-size: 14px; font-weight: bold; color: #FF6F00;">スコア: ${frame.pitch_score || '0'}</p>
+                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #856404;">角度: ${frame.pitch_angle || frame.pitch || '0'}°</p>
                 </div>
                 <div style="padding: 12px; background: #d1ecf1; border-radius: 5px; border: 1px solid #17a2b8;">
                   <strong style="font-size: 12px; color: #0c5460;">Yaw</strong>
-                  <p style="margin: 8px 0 0 0; font-size: 16px; font-weight: bold; color: #2196F3;">${frame.yaw_angle || frame.yaw}</p>
-                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #0c5460;">角度</p>
+                  <p style="margin: 8px 0 4px 0; font-size: 14px; font-weight: bold; color: #2196F3;">スコア: ${frame.yaw_score || '0'}</p>
+                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #0c5460;">角度: ${frame.yaw_angle || frame.yaw || '0'}°</p>
                 </div>
                 <div style="padding: 12px; background: #d4edda; border-radius: 5px; border: 1px solid #28a745;">
                   <strong style="font-size: 12px; color: #155724;">EAR</strong>
-                  <p style="margin: 8px 0 0 0; font-size: 16px; font-weight: bold; color: #4CAF50;">${frame.ear_value || frame.ear}</p>
-                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #155724;">値</p>
+                  <p style="margin: 8px 0 4px 0; font-size: 14px; font-weight: bold; color: #4CAF50;">スコア: ${frame.ear_score || '0'}</p>
+                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #155724;">値: ${frame.ear_value || '0'}</p>
                 </div>
               `;
 
