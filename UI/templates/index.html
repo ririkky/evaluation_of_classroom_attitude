@@ -467,6 +467,8 @@
         <div id="videoGraphDiv" style="margin-top: 30px;">
           <h3>評価スコアの推移</h3>
           <canvas id="scoreGraph" width="1000" height="400" style="border: 1px solid #ddd; margin-bottom: 20px;"></canvas>
+          <h3>平均値一覧</h3>
+          <div id="scoreAverageTable" style="margin-bottom: 30px;"></div>
         </div>
       </div>
 
@@ -1884,6 +1886,71 @@
       ctx.font = 'bold 16px Arial';
       ctx.textAlign = 'center';
       ctx.fillText('評価スコア推移グラフ', width / 2, padding - 20);
+      
+      // 平均値テーブルを表示
+      displayScoreAverageTable();
+    }
+
+    function displayScoreAverageTable() {
+      if (!videoScores || videoScores.length === 0) {
+        return;
+      }
+
+      // 平均値を計算
+      const avgPitch = (videoScores.reduce((a, b) => a + b.pitchScore, 0) / videoScores.length).toFixed(2);
+      const avgYaw = (videoScores.reduce((a, b) => a + b.yawScore, 0) / videoScores.length).toFixed(2);
+      const avgEAR = (videoScores.reduce((a, b) => a + b.earScore, 0) / videoScores.length).toFixed(2);
+      const avgTotal = (videoScores.reduce((a, b) => a + b.totalScore, 0) / videoScores.length).toFixed(2);
+      
+      // 最大値・最小値を計算
+      const maxPitch = Math.max(...videoScores.map(d => d.pitchScore));
+      const minPitch = Math.min(...videoScores.map(d => d.pitchScore));
+      const maxYaw = Math.max(...videoScores.map(d => d.yawScore));
+      const minYaw = Math.min(...videoScores.map(d => d.yawScore));
+      const maxEAR = Math.max(...videoScores.map(d => d.earScore));
+      const minEAR = Math.min(...videoScores.map(d => d.earScore));
+      const maxTotal = Math.max(...videoScores.map(d => d.totalScore));
+      const minTotal = Math.min(...videoScores.map(d => d.totalScore));
+
+      const tableContainer = document.getElementById('scoreAverageTable');
+      tableContainer.innerHTML = `
+        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+          <thead>
+            <tr style="background-color: #f0f0f0; border-bottom: 2px solid #333;">
+              <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">項目</th>
+              <th style="padding: 10px; text-align: center; border: 1px solid #ddd;">平均値</th>
+              <th style="padding: 10px; text-align: center; border: 1px solid #ddd;">最大値</th>
+              <th style="padding: 10px; text-align: center; border: 1px solid #ddd;">最小値</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid #ddd;">
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: #FF6F00;">Pitch</td>
+              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${avgPitch}</td>
+              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${maxPitch}</td>
+              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${minPitch}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #ddd;">
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: #2196F3;">Yaw</td>
+              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${avgYaw}</td>
+              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${maxYaw}</td>
+              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${minYaw}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #ddd;">
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: #4CAF50;">EAR</td>
+              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${avgEAR}</td>
+              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${maxEAR}</td>
+              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${minEAR}</td>
+            </tr>
+            <tr style="background-color: #f5f5f5;">
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: #9C27B0;">Total</td>
+              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${avgTotal}</td>
+              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${maxTotal}</td>
+              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${minTotal}</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
     }
 
     function showVideoStatus(message, type) {
