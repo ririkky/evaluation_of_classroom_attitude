@@ -19,7 +19,7 @@ def run_pipeline():
         "--weights", "yolov7.pt",
         "--conf", "0.25",
         "--img-size", "640",
-        "--source", "input/test2.JPG", # ★画像パスは detect_yolo から見た相対パス
+        "--source", "input/test3.JPEG", # ★画像パスは detect_yolo から見た相対パス
         "--class", "0",
         "--save-txt",
         "--save-faces"
