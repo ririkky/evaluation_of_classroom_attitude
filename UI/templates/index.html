@@ -437,6 +437,18 @@
         <div>
           <input type="file" id="videoInput" accept="video/*" />
           <button id="videoUploadBtn">動画を処理</button>
+          <!-- 抽出FPSを選択 -->
+          <label for="videoFpsSelect" style="margin-left:10px;">抽出FPS:</label>
+          <select id="videoFpsSelect" style="margin-left:6px;">
+            <option value="30">30 fps</option>
+            <option value="15">15 fps</option>
+            <option value="10" selected>10 fps (0.1秒ごと)</option>
+            <option value="5">5 fps (0.2秒ごと)</option>
+            <option value="1">1 fps (1秒ごと)</option>
+            <option value="0.5">0.5 fps (2秒ごと)</option>
+            <option value="0.01">0.1 fps (10秒ごと)</option>
+            <option value="0.01">0.01 fps (100秒ごと)</option>
+          </select>
         </div>
         <div class="upload-status">
           <span id="videoStatusMessage"></span>
@@ -1525,8 +1537,10 @@
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
 
-        const fps = 10; // 0.1秒ごと = 10フレPS
-        const frameDuration = 1000 / fps; // ms単位
+        // UI のセレクトから FPS を取得（秒間フレーム数）
+        let fps = parseFloat(document.getElementById('videoFpsSelect').value) || 10;
+        if (isNaN(fps) || fps <= 0) fps = 10; // 安全策：負または0は許容しない
+        const frameDuration = 1000 / fps; // ms単位（1フレームあたりのミリ秒）
         const totalFrames = Math.ceil(video.duration * fps);
         let frameCount = 0;
 
