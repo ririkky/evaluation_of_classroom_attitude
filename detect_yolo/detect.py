@@ -376,9 +376,9 @@ def detect(save_img=False):
                                                         face_id,
                                                         face_filename,
                                                         total_score,
-                                                        int(round(25 * pitch_score)),
-                                                        int(round(25 * yaw_score)),
-                                                        int(round(25 * ear_score))
+                                                        int(round(30 * pitch_score)),
+                                                        int(round(30 * yaw_score)),
+                                                        int(round(40 * ear_score))
                                                     ]
                                                     writer.writerow(row_data)
                                             except Exception as e:
