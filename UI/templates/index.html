@@ -1566,18 +1566,26 @@
             .then(response => response.json())
             .then(data => {
               console.log('Frame response:', data);
-              if (data.pitch_score && data.yaw_score && data.ear_score) {
+
+              // ランドマークが検出されなかったフレームは評価対象外にする
+              // サーバー側の /api/detect_frame は、検出があった場合に
+              // 'pitch_angle','yaw_angle','ear_value' を返す（CSVの行がある場合）。
+              // 検出がなかった場合はこれらのフィールドが返らないため、それを基準に判定する。
+              if (data && (data.pitch_angle !== undefined && data.pitch_angle !== null
+                  || data.yaw_angle !== undefined && data.yaw_angle !== null
+                  || data.ear_value !== undefined && data.ear_value !== null)) {
                 const scoreData = {
                   frameNumber: frameCount,
-                  pitchScore: parseInt(data.pitch_score),
-                  yawScore: parseInt(data.yaw_score),
-                  earScore: parseInt(data.ear_score),
-                  totalScore: parseInt(data.pitch_score) + parseInt(data.yaw_score) + parseInt(data.ear_score)
+                  pitchScore: parseInt(data.pitch_score) || 0,
+                  yawScore: parseInt(data.yaw_score) || 0,
+                  earScore: parseInt(data.ear_score) || 0,
+                  totalScore: (parseInt(data.pitch_score) || 0) + (parseInt(data.yaw_score) || 0) + (parseInt(data.ear_score) || 0)
                 };
                 videoScores.push(scoreData);
                 console.log('Added score:', scoreData, 'Total scores:', videoScores.length);
               } else {
-                console.log('Missing score data in response');
+                // ランドマークが検出されていないフレームは無視する
+                console.log('No landmarks detected for this frame. Skipping frame', frameCount);
               }
 
               // フレームカウントを先に増やす
@@ -1810,16 +1818,25 @@
       };
 
       // 線を描画する関数
-      const drawLine = (scores, color, label) => {
+      // key: 'pitchScore' / 'yawScore' / 'earScore' / 'totalScore'
+      const drawLine = (key, color, label) => {
+        if (!videoScores || videoScores.length === 0) return;
+
+        // フレーム番号を使ってX位置を決定（抜けのあるフレームはスキップ済み）
+        const frameNums = videoScores.map(d => d.frameNumber);
+        const minFrame = Math.min(...frameNums);
+        const maxFrame = Math.max(...frameNums);
+        const frameRange = Math.max(1, maxFrame - minFrame);
+
         ctx.strokeStyle = color;
         ctx.lineWidth = 2.5;
         ctx.beginPath();
 
-        videoScores.forEach((data, index) => {
-          const x = padding + (graphWidth * index) / (videoScores.length - 1 || 1);
-          const y = padding + graphHeight - (graphHeight * scores[index]) / 100;
+        videoScores.forEach((d, idx) => {
+          const x = padding + (graphWidth * (d.frameNumber - minFrame)) / frameRange;
+          const y = padding + graphHeight - (graphHeight * (d[key] || 0)) / 100;
 
-          if (index === 0) {
+          if (idx === 0) {
             ctx.moveTo(x, y);
           } else {
             ctx.lineTo(x, y);
@@ -1827,21 +1844,21 @@
         });
         ctx.stroke();
 
-        // ドット描画
+        // ドット描画（有効な点のみ）
         ctx.fillStyle = color;
-        videoScores.forEach((data, index) => {
-          const x = padding + (graphWidth * index) / (videoScores.length - 1 || 1);
-          const y = padding + graphHeight - (graphHeight * scores[index]) / 100;
+        videoScores.forEach(d => {
+          const x = padding + (graphWidth * (d.frameNumber - minFrame)) / frameRange;
+          const y = padding + graphHeight - (graphHeight * (d[key] || 0)) / 100;
           ctx.beginPath();
           ctx.arc(x, y, 4, 0, Math.PI * 2);
           ctx.fill();
         });
       };
 
-      // 各スコアの線を描画
-      drawLine(videoScores.map(d => d.pitchScore), colors.pitch, 'Pitch');
-      drawLine(videoScores.map(d => d.yawScore), colors.yaw, 'Yaw');
-      drawLine(videoScores.map(d => d.earScore), colors.ear, 'EAR');
+  // 各スコアの線を描画（ランドマーク検出されたフレームのみ）
+  drawLine('pitchScore', colors.pitch, 'Pitch');
+  drawLine('yawScore', colors.yaw, 'Yaw');
+  drawLine('earScore', colors.ear, 'EAR');
 
       // 総合スコアの計算と描画
       const avgPitch = (videoScores.reduce((a, b) => a + b.pitchScore, 0) / videoScores.length).toFixed(1);
@@ -1850,7 +1867,7 @@
       const avgTotal = (videoScores.reduce((a, b) => a + b.totalScore, 0) / videoScores.length).toFixed(1);
       colors.total = '#9C27B0'; // Total score color
 
-      drawLine(videoScores.map(d => d.totalScore), colors.total, 'Total');
+  drawLine('totalScore', colors.total, 'Total');
 
       // 凡例と平均値を表示
       const legendX = width - 220;
