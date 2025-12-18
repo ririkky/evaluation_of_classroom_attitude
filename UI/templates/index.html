@@ -587,18 +587,18 @@
         return;
       }
 
-      let html = '<table><thead><tr>' +
-        '<th>メッシュID</th>' +
-        '<th>顔画像</th>' +
-        '<th>総合スコア</th>' +
-        '<th>Pitch<br/>スコア</th>' +
-        '<th>Pitch<br/>角度</th>' +
-        '<th>Yaw<br/>スコア</th>' +
-        '<th>Yaw<br/>角度</th>' +
-        '<th>EAR<br/>スコア</th>' +
-        '<th>EAR<br/>値</th>' +
-        '<th>ランドマーク<br/>詳細</th>' +
-        '</tr></thead><tbody>';
+  let html = '<table><thead><tr>' +
+    '<th>メッシュID</th>' +
+    '<th>顔画像</th>' +
+  '<th>総合点</th>' +
+  '<th>顔の傾き<br/>（縦方向）<br/>スコア</th>' +
+  '<th>顔の傾き<br/>（縦方向）<br/>角度</th>' +
+  '<th>顔の傾き<br/>（横方向）<br/>スコア</th>' +
+  '<th>顔の傾き<br/>（横方向）<br/>角度</th>' +
+  '<th>開眼度<br/>スコア</th>' +
+  '<th>開眼度<br/>値</th>' +
+    '<th>ランドマーク<br/>詳細</th>' +
+    '</tr></thead><tbody>';
 
       allImages.forEach(img => {
         const scoreClass = getScoreClass(parseInt(img.total_score));
@@ -625,7 +625,7 @@
       
       // Pitch/Yaw (solvePnP用)
       html += '<div style="border: 2px solid #4CAF50; padding: 15px; border-radius: 8px; background-color: white;">';
-      html += '<h4 style="color: #4CAF50; margin-top: 0;">🔄 Pitch / Yaw（顔の向き）</h4>';
+  html += '<h4 style="color: #4CAF50; margin-top: 0;">🔄 顔の傾き<br/>（縦方向） / 顔の傾き<br/>（横方向）（顔の向き）</h4>';
       html += '<p style="font-size: 13px; color: #666;">solvePnP法で6つのランドマークから3D姿勢を推定</p>';
       html += '<ul style="font-size: 14px; line-height: 1.8;">';
       html += '<li><strong>#1</strong>: 鼻先 (Nose tip)</li>';
@@ -641,7 +641,7 @@
       
       // EAR
       html += '<div style="border: 2px solid #2196F3; padding: 15px; border-radius: 8px; background-color: white;">';
-      html += '<h4 style="color: #2196F3; margin-top: 0;">👁️ EAR（目の開き具合）</h4>';
+    html += '<h4 style="color: #2196F3; margin-top: 0;">👁️ 開眼度</h4>';
       html += '<p style="font-size: 13px; color: #666;">両目各6ポイントから開眼度を計算</p>';
       html += '<div style="margin-bottom: 10px;">';
       html += '<strong style="color: #FF9800;">左目:</strong>';
@@ -867,7 +867,7 @@
       // Pitch スケール
       html += `
         <div style="margin-bottom: 40px;">
-          <h2 style="color: #FF6B6B; border-bottom: 3px solid #FF6B6B; padding-bottom: 10px;">📐 Pitch（顔の上下傾き） - 20段階スケール</h2>
+          <h2 style="color: #FF6B6B; border-bottom: 3px solid #FF6B6B; padding-bottom: 10px;">📐 顔の傾き<br/>（縦方向） - 20段階スケール</h2>
           <p style="color: #666; margin-bottom: 20px;">負の値（-）ほど床を見ている、正の値（+）ほど天井を見ているを示しています。</p>
           
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 15px; margin-bottom: 30px;">
@@ -904,7 +904,7 @@
         
         html += `
           <div style="text-align: center;">
-            <img src="${imgSrc}" alt="Pitch ${p.val}°" 
+            <img src="${imgSrc}" alt="顔の傾き（縦方向） ${p.val}°" 
                  style="width: 70px; height: 70px; border-radius: 50%; border: 3px solid ${color}; object-fit: cover; opacity: ${opacity};">
             <p style="margin: 8px 0 2px 0; font-weight: bold; color: ${color}; font-size: 13px;">${p.label}</p>
             <p style="margin: 0; font-size: 11px; color: #999;">${p.desc}</p>
@@ -917,7 +917,7 @@
       // Yaw スケール
       html += `
         <div style="margin-bottom: 40px;">
-          <h2 style="color: #FF6B6B; border-bottom: 3px solid #FF6B6B; padding-bottom: 10px;">🔄 Yaw（顔の左右回転） - 20段階スケール</h2>
+          <h2 style="color: #FF6B6B; border-bottom: 3px solid #FF6B6B; padding-bottom: 10px;">🔄 顔の傾き<br/>（横方向） - 20段階スケール</h2>
           <p style="color: #666; margin-bottom: 20px;">負の値（-）ほど左向き、正の値（+）ほど右向きを示しています。</p>
           
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 15px; margin-bottom: 30px;">
@@ -954,7 +954,7 @@
         
         html += `
           <div style="text-align: center;">
-            <img src="${imgSrc}" alt="Yaw ${y.val}°" 
+            <img src="${imgSrc}" alt="顔の傾き（横方向） ${y.val}°" 
                  style="width: 70px; height: 70px; border-radius: 50%; border: 3px solid ${color}; object-fit: cover; opacity: ${opacity};">
             <p style="margin: 8px 0 2px 0; font-weight: bold; color: ${color}; font-size: 13px;">${y.label}</p>
             <p style="margin: 0; font-size: 11px; color: #999;">${y.desc}</p>
@@ -967,7 +967,7 @@
       // EAR スケール
       html += `
         <div style="margin-bottom: 40px;">
-          <h2 style="color: #2196F3; border-bottom: 3px solid #2196F3; padding-bottom: 10px;">👁️ EAR（目の開き具合） - 20段階スケール</h2>
+          <h2 style="color: #2196F3; border-bottom: 3px solid #2196F3; padding-bottom: 10px;">👁️ 開眼度 - 20段階スケール</h2>
           <p style="color: #666; margin-bottom: 20px;">値が大きいほど目が開いています。0.20以上で「目が開いている（良好）」と判定されます。</p>
           
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 15px; margin-bottom: 30px;">
@@ -1064,7 +1064,7 @@
         return canvas.toDataURL('image/png');
       }
       
-      // EAR: 0 から 0.62 まで 20段階
+  // EAR: 0 から 0.62 まで 20段階
       const earValuesNew = [];
       for (let i = 0; i < 20; i++) {
         const val = (i / 19) * 0.62; // 0 から 0.62 まで均等分割
@@ -1109,9 +1109,9 @@
         <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin-top: 30px;">
           <h3 style="margin-top: 0; color: #333;">📊 使い方</h3>
           <ul style="line-height: 2;">
-            <li><strong>Pitch（上下傾き）:</strong> 画像を上下に回転させて段階を表現しています</li>
-            <li><strong>Yaw（左右回転）:</strong> 画像が実際に左右に向くように表現しています（左向き/右向き）</li>
-            <li><strong>EAR（目の開き具合）:</strong> 絵文字で目の開き具合を表現しています（😴 ← → 😁）</li>
+            <li><strong>顔の傾き<br/>（縦方向）:</strong> 画像を上下に回転させて段階を表現しています</li>
+            <li><strong>顔の傾き<br/>（横方向）:</strong> 画像が実際に左右に向くように表現しています（左向き/右向き）</li>
+            <li><strong>開眼度:</strong> 絵文字で開眼度を表現しています（😴 ← → 😁）</li>
           </ul>
           <p style="color: #666; margin-bottom: 0;">各スケールは<strong>20段階</strong>に分割されており、実際の検出値との比較に使用できます。</p>
         </div>
@@ -1286,17 +1286,17 @@
       showInfoModal('🔄 Yaw角度（顔の左右回転）の測定方法', content, landmarkUrl);
     }
 
-    // ========== EAR値の説明 ==========
+      // ========== EAR値の説明 ==========
     function showEarInfo(landmarkUrl, earValue) {
       const content = `
         <div style="font-size: 16px; line-height: 1.8;">
           <p><strong>検出値:</strong> <span style="color: #2196F3; font-size: 24px; font-weight: bold;">${earValue}</span></p>
           
-          <h3 style="color: #2196F3;">👁️ EAR（Eye Aspect Ratio：目の開き具合）とは</h3>
-          <p>目がどれくらい開いているかを数値化した指標です。値が大きいほど目が開いています。</p>
+          <h3 style="color: #2196F3;">👁️ 開眼度とは</h3>
+          <p>目がどれくらい開いているかを数値化した指標です。値が大きいほど目が開いています（= 開眼度が高い）。</p>
           
           <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 15px 0;">
-            <p style="font-size: 14px; color: #666; margin: 0 0 15px 0; text-align: center;"><strong>【20段階の目の開き具合】</strong></p>
+            <p style="font-size: 14px; color: #666; margin: 0 0 15px 0; text-align: center;"><strong>【20段階の開眼度】</strong></p>
             <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px;">
               <!-- EAR 0.05 -->
               <div style="text-align: center;">
@@ -1897,20 +1897,31 @@
         let label = '';
         let avgValue = '';
         if (key === 'pitch') {
-          label = 'Pitch';
+          label = '顔の傾き（縦方向）';
           avgValue = avgPitch;
         } else if (key === 'yaw') {
-          label = 'Yaw';
+          label = '顔の傾き（横方向）';
           avgValue = avgYaw;
         } else if (key === 'ear') {
-          label = 'EAR';
+          label = '開眼度';
           avgValue = avgEAR;
         } else if (key === 'total') {
-          label = 'Total';
+          label = '総合点';
           avgValue = avgTotal;
         }
-        
-        ctx.fillText(`${label}: ${avgValue}`, legendX + 16, legendY + i * 25 + 10);
+
+        // canvas上での表示: "顔の 傾き..." は2行に分けて描画する
+        const textX = legendX + 16;
+        const baseY = legendY + i * 25 + 6;
+        if (key === 'pitch' || key === 'yaw') {
+          // 分割して2行で描画（"顔の傾き" / "（縦方向）" の形式）
+          const prefix = '顔の傾き';
+          const rest = label.replace(prefix, '');
+          ctx.fillText(prefix, textX, baseY + 8);
+          ctx.fillText(`${rest}: ${avgValue}`, textX, baseY + 22);
+        } else {
+          ctx.fillText(`${label}: ${avgValue}`, textX, baseY + 12);
+        }
       });
 
       // タイトル表示
@@ -1957,19 +1968,19 @@
           </thead>
           <tbody>
             <tr style="border-bottom: 1px solid #ddd;">
-              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: #FF6F00;">Pitch</td>
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: #FF6F00;">顔の傾き<br/>（縦方向）</td>
               <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${avgPitch}</td>
               <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${maxPitch}</td>
               <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${minPitch}</td>
             </tr>
             <tr style="border-bottom: 1px solid #ddd;">
-              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: #2196F3;">Yaw</td>
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: #2196F3;">顔の傾き<br/>（横方向）</td>
               <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${avgYaw}</td>
               <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${maxYaw}</td>
               <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${minYaw}</td>
             </tr>
             <tr style="border-bottom: 1px solid #ddd;">
-              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: #4CAF50;">EAR</td>
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: #4CAF50;">開眼度</td>
               <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${avgEAR}</td>
               <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${maxEAR}</td>
               <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${minEAR}</td>
