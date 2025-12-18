@@ -1,23 +1,16 @@
-def calc_ear(landmarks, indices):
-    # EAR (Eye Aspect Ratio) を計算
-    p = [landmarks[i] for i in indices]
-    vert1 = np.linalg.norm(np.array([p[1].x, p[1].y]) - np.array([p[5].x, p[5].y]))
-    vert2 = np.linalg.norm(np.array([p[2].x, p[2].y]) - np.array([p[4].x, p[4].y]))
-    horiz = np.linalg.norm(np.array([p[0].x, p[0].y]) - np.array([p[3].x, p[3].y]))
-    ear = (vert1 + vert2) / (2.0 * horiz)
-    return ear
 import argparse
 import time
 from pathlib import Path
-import csv  # <-- ★CSV保存のために追加
+import csv
+import math
 
 import cv2
 import torch
 import torch.backends.cudnn as cudnn
 from numpy import random
+import numpy as np
 
-import mediapipe as mp  # Mediapipe 
-import numpy as np # <-- 顔姿勢推定のために追加 (cv2.solvePnP で使用)
+import mediapipe as mp
 
 from models.experimental import attempt_load
 from utils.datasets import LoadStreams, LoadImages
@@ -26,10 +19,101 @@ from utils.general import check_img_size, check_requirements, check_imshow, non_
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
 
+# ==========================================
+# 1. ヘルパー関数 & クラス定義
+# ==========================================
 
-# --- (EAR関連のヘルパー関数は削除) ---
+def calc_ear(landmarks, indices):
+    """EAR (Eye Aspect Ratio) を計算"""
+    p = [landmarks[i] for i in indices]
+    # 縦の距離1
+    vert1 = np.linalg.norm(np.array([p[1].x, p[1].y]) - np.array([p[5].x, p[5].y]))
+    # 縦の距離2
+    vert2 = np.linalg.norm(np.array([p[2].x, p[2].y]) - np.array([p[4].x, p[4].y]))
+    # 横の距離
+    horiz = np.linalg.norm(np.array([p[0].x, p[0].y]) - np.array([p[3].x, p[3].y]))
+    ear = (vert1 + vert2) / (2.0 * horiz)
+    return ear
 
-print("start")
+def rotation_matrix_to_euler_angles(R):
+    """
+    回転行列からオイラー角(Pitch, Yaw, Roll)を計算する。
+    戻り値: (pitch, yaw, roll) 単位は度(degree)
+    """
+    sy = np.sqrt(R[0, 0] * R[0, 0] + R[1, 0] * R[1, 0])
+    singular = sy < 1e-6
+
+    if not singular:
+        x = np.arctan2(R[2, 1], R[2, 2])
+        y = np.arctan2(-R[2, 0], sy)
+        z = np.arctan2(R[1, 0], R[0, 0])
+    else:
+        x = np.arctan2(-R[1, 2], R[1, 1])
+        y = np.arctan2(-R[2, 0], sy)
+        z = 0
+
+    return np.degrees(x), np.degrees(y), np.degrees(z)
+
+class StudentTracker:
+    """
+    簡易トラッカー
+    - 座標の距離で同一人物を判定
+    - Yawの補正機能は今回無効化し、ID管理のみに使用します
+    """
+    def __init__(self, distance_threshold=200, calibration_frames=30):
+        # distance_threshold: IDスイッチを防ぐため少し広めに設定(推奨:200程度)
+        self.students = {} 
+        self.next_id = 1
+        self.dist_thresh = distance_threshold
+        self.calib_frames = calibration_frames
+
+    def update(self, center_x, center_y, current_yaw):
+        """
+        現在の顔座標を受け取り、IDを返す
+        """
+        matched_id = None
+        min_dist = float('inf')
+
+        # 既存の生徒と距離照合
+        for s_id, data in self.students.items():
+            prev_x, prev_y = data['center']
+            # ユークリッド距離
+            dist = np.sqrt((center_x - prev_x)**2 + (center_y - prev_y)**2)
+            
+            if dist < self.dist_thresh and dist < min_dist:
+                min_dist = dist
+                matched_id = s_id
+
+        # 新規生徒の登録（マッチしなかった場合）
+        if matched_id is None:
+            matched_id = self.next_id
+            self.students[matched_id] = {
+                'center': (center_x, center_y),
+                'yaw_history': [],
+                'baseline_yaw': 0.0,
+                'count': 0
+            }
+            self.next_id += 1
+
+        # データ更新
+        student = self.students[matched_id]
+        student['center'] = (center_x, center_y) # 位置情報を更新
+        student['count'] += 1
+
+        # NOTE: 以前はここでベースライン計算をしていましたが、
+        # Yawが0になるのを防ぐため、ここでは単純にID管理だけを行います。
+        # 必要であれば履歴だけ残します。
+        student['yaw_history'].append(current_yaw)
+        
+        # 補正値は常に0（補正しない）として返します
+        student['baseline_yaw'] = 0.0
+        corrected_yaw = current_yaw # そのまま返す
+
+        return matched_id, corrected_yaw, student['baseline_yaw']
+
+# ==========================================
+# 2. メイン検出ロジック
+# ==========================================
 
 def detect(save_img=False):
     source, weights, view_img, save_txt, imgsz, trace = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size, not opt.no_trace
@@ -41,10 +125,9 @@ def detect(save_img=False):
     save_dir = Path(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok))  # increment run
     (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
     
-    # 顔画像保存用ディレクトリ（相対パス）
+    # 顔画像・CSV保存用ディレクトリ
     face_output_dir = Path("images/faces")
     face_output_dir.mkdir(parents=True, exist_ok=True)
-    # CSV保存用ディレクトリ・ファイル（相対パス）
     csv_output_dir = Path("images")
     csv_output_dir.mkdir(parents=True, exist_ok=True)
     csv_file_path = csv_output_dir / "results.csv"
@@ -53,16 +136,14 @@ def detect(save_img=False):
     set_logging()
     device = select_device(opt.device)
     
-    # --- Mediapipe  ---
+    # --- Mediapipe Init ---
     mp_face_mesh = mp.solutions.face_mesh
-    # 
-    # refine_landmarks=True を追加して、目と唇のランドマーク精度を向上 (478点)
     face_mesh = mp_face_mesh.FaceMesh(max_num_faces=5, 
                                       min_detection_confidence=0.5, 
                                       min_tracking_confidence=0.5, 
                                       refine_landmarks=True) 
     mp_drawing = mp.solutions.drawing_utils
-    # --- Mediapipe  ---
+    # ----------------------
 
     half = device.type != 'cpu'  # half precision only supported on CUDA
 
@@ -102,31 +183,29 @@ def detect(save_img=False):
     old_img_w = old_img_h = imgsz
     old_img_b = 1
 
-
-    # --- ★修正: 顔の傾き推定用変数 (カウンター関連を削除) ---
-    HEAD_PITCH_THRESH = 20.0 # 前傾（うなずき）のしきい値 (度) (この値は調整が必要)
-    # HEAD_PITCH_CONSEC_FRAMES = 15 # (不要になったため削除)
-    # FACE_COUNTERS = {} # (不要になったため削除)
-    # --- 顔の傾き推定用変数 ---
-
-    # --- solvePnP用 3Dモデル座標 (6点) ---
-    # (Y軸は下が負、Z軸は奥が負)
+    # --- solvePnP用 3Dモデル座標 (Canonical Face Model) ---
     model_points = np.array([
-        (0.0, 0.0, 0.0),             # 1: Nose tip
-        (0.0, -330.0, -65.0),        # 152: Chin
-        (-225.0, 170.0, -135.0),     # 33: Left eye left corner (左目の内側)
-        (225.0, 170.0, -135.0),      # 263: Right eye right corner (右目の内側)
-        (-150.0, -150.0, -125.0),    # 61: Left Mouth corner
-        (150.0, -150.0, -125.0)      # 291: Right mouth corner
-    ], dtype="double")
-    # solvePnP用 ランドマークインデックス
+        (0.0, 0.0, 0.0),             # Nose tip (1)
+        (0.0, 330.0, -65.0),         # Chin (152)
+        (-225.0, -170.0, -135.0),    # Left eye corner
+        (225.0, -170.0, -135.0),     # Right eye corner
+        (-150.0, 150.0, -125.0),     # Left Mouth corner
+        (150.0, 150.0, -125.0)       # Right mouth corner
+    ], dtype=np.float64)
+    
+    # solvePnP用 ランドマークインデックス (MediaPipe)
     POSE_INDICES = [1, 152, 33, 263, 61, 291]
-    # --- solvePnP用 3Dモデル座標 ---
+    
+    # 目の開き具合（EAR）用インデックス
+    LEFT_EYE_INDICES = [33, 160, 158, 133, 153, 144]
+    RIGHT_EYE_INDICES = [362, 385, 387, 263, 373, 380]
 
-    # --- ★追加: CSVファイルを初期化 (ヘッダー書き込み) ---
-    csv_header = ["メッシュID", "パス", "総合スコア", "Pitchスコア", "Yawスコア", "EARスコア", "Pitch角度(度)", "Yaw角度(度)", "EAR値", "ランドマーク画像"]
-    # 'w' (write)モードでファイルを開き、ヘッダーを書き込む
-    # 実行のたびに上書きされます（--append-csv オプションがない場合）
+    # --- トラッカーの初期化 (閾値を少し緩く設定) ---
+    tracker = StudentTracker(distance_threshold=200, calibration_frames=30)
+    # -------------------------------------
+
+    # --- CSVヘッダー書き込み ---
+    csv_header = ["TrackingID", "パス", "総合スコア", "Pitchスコア", "Yawスコア", "EARスコア", "Pitch(度)", "Yaw(度)", "基準Yaw(Bias)", "EAR値", "ランドマーク画像"]
     if not opt.append_csv:
         try:
             with open(csv_file_path, 'w', newline='', encoding='utf-8') as f_csv:
@@ -134,8 +213,6 @@ def detect(save_img=False):
                 writer.writerow(csv_header)
         except Exception as e:
             print(f"Error initializing CSV file {csv_file_path}: {e}")
-    # ----------------------------------------------------
-
 
     t0 = time.time()
     for path, img, im0s, vid_cap in dataset:
@@ -155,7 +232,7 @@ def detect(save_img=False):
 
         # Inference
         t1 = time_synchronized()
-        with torch.no_grad():   # Calculating gradients would cause a GPU memory leak
+        with torch.no_grad():
             pred = model(img, augment=opt.augment)[0]
         t2 = time_synchronized()
 
@@ -178,6 +255,7 @@ def detect(save_img=False):
             save_path = str(save_dir / p.name)  # img.jpg
             txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # img.txt
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
+            
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
@@ -199,116 +277,113 @@ def detect(save_img=False):
                         label = f'{names[int(cls)]} {conf:.2f}'
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
 
-                        # --- Mediapipe  ---
-                        #  (int(cls) == 0) (person クラスを想定)
+                        # --- Mediapipe Process (Only for person class) ---
                         if int(cls) == 0:
                             try:
-                                # YOLOv7
                                 x1, y1, x2, y2 = int(xyxy[0]), int(xyxy[1]), int(xyxy[2]), int(xyxy[3])
                                 
-                                # 
+                                # Clamp coordinates
                                 if x1 < 0: x1 = 0
                                 if y1 < 0: y1 = 0
                                 if x2 > im0.shape[1]: x2 = im0.shape[1]
                                 if y2 > im0.shape[0]: y2 = im0.shape[0]
                                 
-                                # 
                                 person_roi = im0[y1:y2, x1:x2]
                                 roi_shape = person_roi.shape # (height, width, channels)
 
-                                # 
                                 if person_roi.size == 0:
-                                    continue # 
+                                    continue 
 
-                                # OpenCV(BGR)  RGB 
                                 roi_rgb = cv2.cvtColor(person_roi, cv2.COLOR_BGR2RGB)
-                                roi_rgb.flags.writeable = False # 
-                                
-                                # Mediapipe 
+                                roi_rgb.flags.writeable = False 
                                 results = face_mesh.process(roi_rgb)
-                                
-                                roi_rgb.flags.writeable = True # 
+                                roi_rgb.flags.writeable = True 
 
-                                # 
                                 if results.multi_face_landmarks:
-                                    
                                     for face_landmarks in results.multi_face_landmarks:
                                         
-                                        # (簡易ID: 最初のランドマークのy座標)
-                                        face_id = int(face_landmarks.landmark[0].y * 100) 
-                                        print(f"Detected Face ID: {face_id}") # コンソール出力
-
-                                        # --- ★修正: CSV書き込み用変数の初期化 ---
-                                        face_save_path_str = None # CSVに書き込むパス
-                                        status = "unknown" # 評価のデフォルト
-                                        color = (255, 0, 0) # デフォルト色 (青)
-                                        # ---------------------------------------
-
-                                        # --- ★修正: 顔画像の保存処理 (サブディレクトリなし) ---
-                                        if opt.save_faces: # --save-faces が有効な場合のみ保存
-                                            
-                                            timestamp = time.strftime("%Y%m%d-%H%M%S")
-                                            # ★修正: face_id をファイル名に含めて一意にする
-                                            face_filename = f"face_id_{face_id}_{timestamp}_{frame}.jpg"
-                                            
-                                            # ★修正: face_output_dir (ベースパス) とファイル名を結合
-                                            face_save_path = face_output_dir / face_filename
-                                            face_save_path_str = str(face_save_path) # ★CSV用に文字列パスを保持
-                                            
-                                            # ★修正: cv2.imwrite に「完全なファイルパス(str)」と「画像(person_roi)」を渡す
-                                            # person_roi は Mediapipe 処理前の元の顔画像 (YOLOv7で検出された範囲)
-                                            cv2.imwrite(str(face_save_path), person_roi) 
-                                            print(f"Saved face for ID {face_id} to {face_save_path}")
-                                        # ----------------------------------------
-                                        
-                                        # ★修正: FACE_COUNTERS への格納処理を削除 (不要)
-
                                         all_landmarks = face_landmarks.landmark
+                                        
+                                        # 変数初期化
+                                        track_id = -1
+                                        vis_filename = ""
+                                        status = "unknown"
+                                        color = (255, 0, 0)
+                                        pitch = 0.0
+                                        yaw = 0.0
+                                        ear = 0.0
+                                        total_score = 0
+                                        baseline_yaw = 0.0
 
-                                        # === 授業態度スコア計算 ===
+                                        # === 授業態度スコア計算 (改良版 + トラッキング) ===
                                         try:
-                                            # 1. 顔の向き（縦・横）推定（solvePnP）
-                                            focal_length = roi_shape[1]
-                                            center = (roi_shape[1] / 2, roi_shape[0] / 2)
+                                            # 元画像(im0)のサイズを取得
+                                            h_im, w_im = im0.shape[:2]
+                                            
+                                            # 3D-2D 対応点の作成（ROI相対座標 -> 画像絶対座標）
+                                            image_points_list = []
+                                            for idx in POSE_INDICES:
+                                                lm = all_landmarks[idx]
+                                                px = lm.x * roi_shape[1] + x1
+                                                py = lm.y * roi_shape[0] + y1
+                                                image_points_list.append([px, py])
+                                            
+                                            image_points = np.array(image_points_list, dtype=np.float64)
+
+                                            # カメラ行列 (画像全体に基づく)
+                                            focal_length = w_im 
+                                            center = (w_im / 2, h_im / 2)
                                             camera_matrix = np.array(
                                                 [[focal_length, 0, center[0]],
                                                  [0, focal_length, center[1]],
-                                                 [0, 0, 1]], dtype="double")
+                                                 [0, 0, 1]], dtype=np.float64)
                                             dist_coeffs = np.zeros((4, 1))
-                                            image_points = []
-                                            for idx in POSE_INDICES:
-                                                lm = all_landmarks[idx]
-                                                cx = int(lm.x * roi_shape[1])
-                                                cy = int(lm.y * roi_shape[0])
-                                                image_points.append((cx, cy))
-                                            image_points = np.array(image_points, dtype="double")
+
+                                            # solvePnP実行
                                             (success, rotation_vector, translation_vector) = cv2.solvePnP(
                                                 model_points, image_points, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE)
-                                            rotation_matrix, _ = cv2.Rodrigues(rotation_vector)
-                                            sy = np.sqrt(rotation_matrix[0, 0] ** 2 + rotation_matrix[1, 0] ** 2)
-                                            singular = sy < 1e-6
-                                            if not singular:
-                                                pitch = np.degrees(np.arctan2(-rotation_matrix[2, 0], sy))
-                                                yaw = np.degrees(np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0]))
-                                            else:
-                                                pitch = np.degrees(np.arctan2(-rotation_matrix[2, 0], sy))
-                                                yaw = 0
 
-                                            # 2. 目の開き具合（EAR）
-                                            LEFT_EYE_INDICES = [33, 160, 158, 133, 153, 144]
-                                            RIGHT_EYE_INDICES = [362, 385, 387, 263, 373, 380]
+                                            # 回転ベクトル -> 回転行列
+                                            rotation_matrix, _ = cv2.Rodrigues(rotation_vector)
+                                            
+                                            # 回転行列 -> オイラー角
+                                            pitch_raw, yaw_raw, roll_raw = rotation_matrix_to_euler_angles(rotation_matrix)
+                                            
+                                            # === 180度反転問題の対策 ===
+                                            # solvePnPの結果が正面で+/-180度付近になる場合の正規化
+                                            if yaw_raw > 90:
+                                                yaw_raw -= 180
+                                            elif yaw_raw < -90:
+                                                yaw_raw += 180
+                                                
+                                            if pitch_raw > 90:
+                                                pitch_raw -= 180
+                                            elif pitch_raw < -90:
+                                                pitch_raw += 180
+
+                                            # 角度の符号調整
+                                            current_raw_yaw = -yaw_raw 
+
+                                            # === トラッカーによるID特定 ===
+                                            face_cx = (x1 + x2) / 2
+                                            face_cy = (y1 + y2) / 2
+                                            
+                                            track_id, _, _ = tracker.update(face_cx, face_cy, current_raw_yaw)
+                                            
+                                            # ========================================================
+                                            # 【修正箇所】生の計算値をそのまま採用 (補正無効化)
+                                            # ========================================================
+                                            pitch = pitch_raw
+                                            yaw = current_raw_yaw  # <--- ここを生の値に変更しました
+                                            baseline_yaw = 0.0     # 補正なしなので0固定
+
+                                            # EAR計算
                                             left_ear = calc_ear(all_landmarks, LEFT_EYE_INDICES)
                                             right_ear = calc_ear(all_landmarks, RIGHT_EYE_INDICES)
                                             ear = (left_ear + right_ear) / 2.0
 
-                                            # 3. 目線方向（左右目の中心x座標で判定）
-                                            left_eye_center_x = all_landmarks[33].x
-                                            right_eye_center_x = all_landmarks[263].x
-                                            eye_center_x = (left_eye_center_x + right_eye_center_x) / 2
-
-
-                                            # --- スコア計算（EAR=40点、Pitch=30点、Yaw=30点、合計100点）---
-                                            # 顔の向き（縦:Pitch）: 45度超で0点、20度以内で満点、間は線形減点（30点満点）
+                                            # --- スコア計算 ---
+                                            # Pitch (うなずき)
                                             if abs(pitch) <= 20:
                                                 pitch_score = 1.0
                                             elif abs(pitch) >= 45:
@@ -316,7 +391,7 @@ def detect(save_img=False):
                                             else:
                                                 pitch_score = (45 - abs(pitch)) / 25.0
 
-                                            # 顔の向き（横:Yaw）: 45度超で0点、20度以内で満点、間は線形減点（30点満点）
+                                            # Yaw (横向き)
                                             if abs(yaw) <= 20:
                                                 yaw_score = 1.0
                                             elif abs(yaw) >= 45:
@@ -324,7 +399,7 @@ def detect(save_img=False):
                                             else:
                                                 yaw_score = (45 - abs(yaw)) / 25.0
 
-                                            # 目の開き具合: EAR>=0.25で満点、0.15未満で0点、間は線形減点（40点満点）
+                                            # EAR (眠気)
                                             if ear >= 0.25:
                                                 ear_score = 1.0
                                             elif ear < 0.15:
@@ -332,149 +407,110 @@ def detect(save_img=False):
                                             else:
                                                 ear_score = (ear - 0.15) / 0.10
 
-                                            # 合計スコア（100点満点）
                                             total_score = int(round(
                                                 max(0, min(30 * pitch_score, 30)) +
                                                 max(0, min(30 * yaw_score, 30)) +
                                                 max(0, min(40 * ear_score, 40))
                                             ))
 
-
-                                            # スコアに応じてstatusを変更（good:70点以上, normal:50点以上, bad:それ未満）
                                             if total_score >= 70:
-                                                status = f"good ({total_score})"
+                                                status = f"Good ({total_score})"
                                                 color = (0, 0, 255) # 赤
                                             elif total_score >= 50:
-                                                status = f"normal ({total_score})"
+                                                status = f"Normal ({total_score})"
                                                 color = (0, 165, 255) # オレンジ
                                             else:
-                                                status = f"bad ({total_score})"
+                                                status = f"Bad ({total_score})"
                                                 color = (0, 255, 0) # 緑
 
-                                            # デバッグ出力
-                                            print(f"  Face ID {face_id} Pitch:{pitch:.1f} Yaw:{yaw:.1f} EAR:{ear:.3f} -> Score:{total_score}")
+                                            # デバッグ出力（生の値を確認するため）
+                                            # print(f"  ID:{track_id} Yaw:{yaw:.1f} Pitch:{pitch:.1f} EAR:{ear:.3f}")
 
-                                            # 画像左上にスコア・評価を描画
-                                            cv2.putText(person_roi, status, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
-                                            cv2.putText(person_roi, f"Pitch:{pitch:.1f} Yaw:{yaw:.1f}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
-                                            cv2.putText(person_roi, f"EAR:{ear:.3f}", (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+                                            # 画像に情報を描画
+                                            cv2.putText(person_roi, f"ID:{track_id} {status}", (5, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                                            cv2.putText(person_roi, f"P:{pitch:.0f} Y:{yaw:.0f}", (5, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+                                            cv2.putText(person_roi, f"EAR:{ear:.2f}", (5, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
 
                                         except Exception as e_pose:
                                             print(f"Error in Head Pose estimation: {e_pose}")
                                             status = "error"
                                             total_score = 0
 
-                                        # --- ★ランドマーク可視化画像の保存 ---
-                                        vis_filename = ""
-                                        if opt.save_faces:
+                                        # --- 顔画像の保存 ---
+                                        face_filename = ""
+                                        if opt.save_faces: 
+                                            timestamp = time.strftime("%Y%m%d-%H%M%S")
+                                            face_filename = f"id_{track_id}_{timestamp}_{frame}.jpg"
+                                            face_save_path = face_output_dir / face_filename
+                                            cv2.imwrite(str(face_save_path), person_roi) 
+                                            
                                             try:
-                                                # 可視化用に別のコピーを作成
                                                 vis_roi = person_roi.copy()
                                                 h_roi, w_roi = vis_roi.shape[:2]
-                                                
-                                                # Pitch/Yaw用のランドマークを強調表示（赤い大きな円）
                                                 for idx in POSE_INDICES:
                                                     lm = face_landmarks.landmark[idx]
                                                     cx, cy = int(lm.x * w_roi), int(lm.y * h_roi)
-                                                    cv2.circle(vis_roi, (cx, cy), 5, (0, 0, 255), -1)  # 赤い円
-                                                    cv2.putText(vis_roi, f"#{idx}", (cx+8, cy-8), 
-                                                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
+                                                    cv2.circle(vis_roi, (cx, cy), 3, (0, 0, 255), -1)
                                                 
-                                                # EAR用のランドマークを強調表示（青い円）
-                                                for idx in LEFT_EYE_INDICES + RIGHT_EYE_INDICES:
-                                                    lm = face_landmarks.landmark[idx]
-                                                    cx, cy = int(lm.x * w_roi), int(lm.y * h_roi)
-                                                    cv2.circle(vis_roi, (cx, cy), 4, (255, 0, 0), -1)  # 青い円
-                                                    cv2.putText(vis_roi, f"#{idx}", (cx+8, cy-8), 
-                                                               cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255, 0, 0), 1)
-                                                
-                                                # Pitch/Yawの角度を画像に描画
-                                                cv2.putText(vis_roi, f"Pitch: {pitch:.1f}deg", (10, 30), 
-                                                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-                                                cv2.putText(vis_roi, f"Yaw: {yaw:.1f}deg", (10, 60), 
-                                                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-                                                cv2.putText(vis_roi, f"EAR: {ear:.3f}", (10, 90), 
-                                                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
-                                                
-                                                # 可視化画像を保存（face_output_dir と同じ場所に保存）
-                                                vis_filename = f"landmarks_{face_filename}"
+                                                vis_filename = f"lm_{face_filename}"
                                                 vis_path = face_output_dir / vis_filename
                                                 cv2.imwrite(str(vis_path), vis_roi)
-                                                print(f"  → Landmarks visualization saved: {vis_filename}")
                                             except Exception as e_vis:
-                                                print(f"Error saving landmarks visualization: {e_vis}")
-                                        # -----------------------------------
+                                                print(f"Error saving vis: {e_vis}")
 
-                                        # --- ★追加: CSVファイルへの追記 ---
-                                        # --save-faces が指定されている場合のみ、CSVに書き込む
-                                        # (画像パス face_save_path_str が "パス" 列に必要なため)
+                                        # --- CSV書き込み ---
                                         if opt.save_faces:
                                             try:
-                                                # 'a' (append)モードでファイルを開く
                                                 with open(csv_file_path, 'a', newline='', encoding='utf-8') as f_csv:
                                                     writer = csv.writer(f_csv)
-                                                    # [メッシュID, パス, 総合スコア, Pitch, Yaw, EAR, Pitch角度, Yaw角度, EAR値, ランドマーク画像]
                                                     row_data = [
-                                                        face_id,
-                                                        face_filename,
-                                                        total_score,
-                                                        int(round(30 * pitch_score)),
-                                                        int(round(30 * yaw_score)),
-                                                        int(round(40 * ear_score)),
-                                                        f"{pitch:.1f}",      # Pitch角度（度）
-                                                        f"{yaw:.1f}",        # Yaw角度（度）
-                                                        f"{ear:.3f}",        # EAR値
-                                                        vis_filename         # ランドマーク画像
+                                                        track_id, face_filename, total_score,
+                                                        int(round(30 * pitch_score)), int(round(30 * yaw_score)), int(round(40 * ear_score)),
+                                                        f"{pitch:.1f}", f"{yaw:.1f}", f"{baseline_yaw:.1f}", f"{ear:.3f}", vis_filename
                                                     ]
                                                     writer.writerow(row_data)
                                             except Exception as e:
-                                                print(f"Error writing to CSV file: {e}")
-                                        # -----------------------------------
+                                                print(f"CSV Write Error: {e}")
 
-
-                                        # --- 顔メッシュ描画 (元のコードの cv2.circle の代わり) ---
-                                        # メッシュを ROI (person_roi) に描画
+                                        # Mediapipe Mesh Draw
                                         mp_drawing.draw_landmarks(
-                                            image=person_roi, # ROI 
+                                            image=person_roi, 
                                             landmark_list=face_landmarks,
                                             connections=mp_face_mesh.FACEMESH_TESSELATION, 
                                             landmark_drawing_spec=None,
                                             connection_drawing_spec=mp_drawing.DrawingSpec(color=(0,255,0), thickness=1, circle_radius=1))
                                         
-                                        # 状態を描画した person_roi を im0 に戻す
+                                        # ROIを戻す
                                         im0[y1:y2, x1:x2] = person_roi
-
-                                        # 1つの顔だけ処理して break
                                         break 
                                         
                             except Exception as e:
                                 print(f"Error processing face mesh: {e}")
-                        # --- Mediapipe  ---
+                        # -----------------------------------------------
 
-
-            # Print time (inference + NMS)
+            # Print time
             print(f'{s}Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
 
             # Stream results
             if view_img:
                 cv2.imshow(str(p), im0)
-                cv2.waitKey(1)  # 1 millisecond
+                cv2.waitKey(1)
 
-            # Save results (image with detections)
+            # Save results
             if save_img:
                 if dataset.mode == 'image':
                     cv2.imwrite(save_path, im0)
                     print(f" The image with the result is saved in: {save_path}")
-                else:  # 'video' or 'stream'
-                    if vid_path != save_path:  # new video
+                else:
+                    if vid_path != save_path:
                         vid_path = save_path
                         if isinstance(vid_writer, cv2.VideoWriter):
-                            vid_writer.release()  # release previous video writer
-                        if vid_cap:  # video
+                            vid_writer.release()
+                        if vid_cap:
                             fps = vid_cap.get(cv2.CAP_PROP_FPS)
                             w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                             h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                        else:  # stream
+                        else:
                             fps, w, h = 30, im0.shape[1], im0.shape[0]
                             save_path += '.mp4'
                         vid_writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
@@ -482,9 +518,7 @@ def detect(save_img=False):
 
     if save_txt or save_img:
         s = f"\n{len(list(save_dir.glob('labels/*.txt')))} labels saved to {save_dir / 'labels'}" if save_txt else ''
-        #print(f"Results saved to {save_dir}{s}")
     
-    # ★CSVファイルの保存場所をコンソールに表示
     if opt.save_faces:
         print(f"CSV results saved to {csv_file_path}")
 
@@ -494,7 +528,7 @@ def detect(save_img=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', nargs='+', type=str, default='yolov7.pt', help='model.pt path(s)')
-    parser.add_argument('--source', type=str, default='inference/images', help='source')  # file/folder, 0 for webcam
+    parser.add_argument('--source', type=str, default='inference/images', help='source')
     parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='object confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='IOU threshold for NMS')
@@ -511,17 +545,13 @@ if __name__ == '__main__':
     parser.add_argument('--name', default='exp', help='save results to project/name')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--no-trace', action='store_true', help='don`t trace model')
-    # --- ★追加: 顔画像の保存を制御する引数 ---
-    # ★ (この引数がCSV保存も兼ねます)
     parser.add_argument('--save-faces', action='store_true', help='save detected face images and CSV results by Face ID')
     parser.add_argument('--append-csv', action='store_true', help='append to existing CSV instead of overwriting')
-    # ----------------------------------------
     opt = parser.parse_args()
     print(opt)
-    #check_requirements(exclude=('pycocotools', 'thop'))
 
     with torch.no_grad():
-        if opt.update:  # update all models (to fix SourceChangeWarning)
+        if opt.update:
             for opt.weights in ['yolov7.pt']:
                 detect()
                 strip_optimizer(opt.weights)
