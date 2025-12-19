@@ -4,34 +4,30 @@ import subprocess
 import sys
 import tempfile
 import shutil
-from pathlib import Path
 from flask import Flask, render_template, jsonify, send_from_directory, request
 
 app = Flask(__name__)
 
-# === ★ここを修正（隣のフォルダを見に行く設定） ===
-# 現在の app3.py のあるフォルダの一つ上(..)の、detect_yolo/images を指すようにする
-BASE_DIR = os.path.dirname(os.path.abspath(__file__)) # UIフォルダ
-DETECT_DIR = os.path.join(BASE_DIR, '..', 'detect_yolo') # detect_yoloフォルダ
-BASE_OUTPUT_DIR = os.path.join(DETECT_DIR, 'images') # detect_yolo/images
+# パス設定
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # UIフォルダ
+DETECT_DIR = os.path.join(BASE_DIR, '..', 'detect_yolo')  # detect_yoloフォルダ
+BASE_OUTPUT_DIR = os.path.join(DETECT_DIR, 'images')  # detect_yolo/images
 
 CSV_PATH = os.path.join(BASE_OUTPUT_DIR, 'results.csv')
 FACES_DIR = os.path.join(BASE_OUTPUT_DIR, 'faces')
 
 # 入力画像用のテンポラリディレクトリ
 TEMP_INPUT_DIR = os.path.join(DETECT_DIR, 'temp_input')
-# ============================================
+
 
 def load_results_from_csv():
     image_map = []
 
     try:
-        # detect.pyが出力したCSVを読み込む（ヘッダと行をインデックスで扱い、カラムずれに耐性を持たせる）
         with open(CSV_PATH, mode='r', encoding='utf-8') as file:
             reader = csv.reader(file)
             header = next(reader)
 
-            # ヘッダのインデックスを探す（存在しない場合は -1）
             def idx(name):
                 try:
                     return header.index(name)
@@ -64,9 +60,6 @@ def load_results_from_csv():
                 ear_value = get_at(row, ear_idx)
                 landmark_img = get_at(row, landmark_idx)
 
-                # ヘッダとデータのずれの可能性に備え、ランドマークの位置に数値がある場合は
-                # それが実際の EAR 値（もしくはその他の数値）であり、次のカラムがランドマーク画像名である
-                # ことが多いため補正する。
                 def is_float_str(s):
                     try:
                         float(str(s))
@@ -75,40 +68,29 @@ def load_results_from_csv():
                         return False
 
                 if landmark_img and is_float_str(landmark_img):
-                    # 例: landmark_img が '0.109' のような数値になっている場合
-                    # 次のカラムに画像ファイル名が入っている可能性が高い
                     next_idx = landmark_idx + 1
                     next_val = get_at(row, next_idx)
                     if next_val:
-                        # もし ear_value が空または 0 系なら、ここで補正する
                         if ear_value in ('', '0', '0.0'):
                             ear_value = landmark_img
                         landmark_img = next_val
 
-                # パスが絶対パスや重複パスになっていないか考慮し、ファイル名だけ抽出
                 filename = os.path.basename(path_value)
-
-                # 実際の画像ファイルの場所を確認
                 image_path = os.path.join(FACES_DIR, filename)
 
                 if not os.path.exists(image_path):
-                    # 画像がない場合はデバッグ表示してスキップ（顔が検出されなかったフレーム）
                     print(f"⚠️ Image file not found (face not detected): {image_path}")
                     print(f"  CSV row: mesh_id={mesh_id}, filename={filename}")
                     continue
 
-                # ブラウザ用URL (Flaskのルート経由)
                 image_url = f"/images/faces/{filename}"
 
-                # ランドマーク画像のURLも生成
                 landmark_url = ""
                 if landmark_img:
-                    # landmark_imgはCSVに記録されたファイル名
                     landmark_path = os.path.join(FACES_DIR, landmark_img)
                     if os.path.exists(landmark_path):
                         landmark_url = f"/images/faces/{landmark_img}"
                     else:
-                        # デバッグ：ファイルが見つからない場合
                         print(f"⚠️ Landmark image not found: {landmark_path}")
                         print(f"  Expected file: {landmark_img}")
                         print(f"  FACES_DIR: {FACES_DIR}")
@@ -140,24 +122,21 @@ def run_detect(image_path):
     detect.py を実行して検出結果を生成
     """
     try:
-        # CSVとfaces ディレクトリをクリア
         if os.path.exists(CSV_PATH):
             os.remove(CSV_PATH)
         if os.path.exists(FACES_DIR):
             shutil.rmtree(FACES_DIR)
 
-        # 入力画像ディレクトリを作成
         os.makedirs(TEMP_INPUT_DIR, exist_ok=True)
         temp_image_path = os.path.join(TEMP_INPUT_DIR, os.path.basename(image_path))
         shutil.copy(image_path, temp_image_path)
 
-        # detect.py コマンド作成
         detect_cmd = [
             sys.executable, "detect.py",
             "--weights", "yolov7.pt",
             "--conf", "0.25",
             "--img-size", "640",
-            "--source", f"temp_input/{os.path.basename(image_path)}",  # 相対パス
+            "--source", f"temp_input/{os.path.basename(image_path)}",
             "--class", "0",
             "--save-txt",
             "--save-faces"
@@ -166,13 +145,12 @@ def run_detect(image_path):
         print(f"🔍 detect.py 実行: {' '.join(detect_cmd)}")
         print(f"📁 作業ディレクトリ: {DETECT_DIR}")
 
-        # detect.py を実行
         result = subprocess.run(
             detect_cmd,
             cwd=DETECT_DIR,
             capture_output=True,
             text=True,
-            timeout=120  # 最大120秒のタイムアウト
+            timeout=120
         )
 
         if result.returncode != 0:
@@ -184,9 +162,8 @@ def run_detect(image_path):
         print(f"✅ detect.py 実行成功")
         print(f"stdout: {result.stdout}")
 
-        # 結果ファイルが生成されたか確認
         if not os.path.exists(CSV_PATH):
-            return False, f"CSV出力ファイルが生成されませんでした"
+            return False, "CSV出力ファイルが生成されませんでした"
 
         return True, "検出完了"
 
@@ -211,9 +188,6 @@ def get_images():
 
 @app.route('/api/detect', methods=['POST'])
 def detect_endpoint():
-    """
-    HTMLからアップロードされた画像に対して detect.py を実行
-    """
     try:
         if 'file' not in request.files:
             return jsonify({'success': False, 'error': 'ファイルが見つかりません'}), 400
@@ -222,19 +196,15 @@ def detect_endpoint():
         if file.filename == '':
             return jsonify({'success': False, 'error': 'ファイルが選択されていません'}), 400
 
-        # 許可される拡張子
         ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp'}
         if not ('.' in file.filename and file.filename.split('.')[-1].lower() in ALLOWED_EXTENSIONS):
             return jsonify({'success': False, 'error': 'サポートされていない画像形式です'}), 400
 
-        # テンポラリファイルに保存
         temp_path = os.path.join(tempfile.gettempdir(), file.filename)
         file.save(temp_path)
 
-        # detect.py 実行
         success, message = run_detect(temp_path)
 
-        # テンポラリファイル削除
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
@@ -248,21 +218,17 @@ def detect_endpoint():
         return jsonify({'success': False, 'error': f'サーバーエラー: {str(e)}'}), 500
 
 
-# ★修正: 動画フレーム処理エンドポイント
 @app.route('/api/detect_frame', methods=['POST'])
 def detect_frame():
-    """
-    動画の1フレームをBase64画像として受け取り、detect.pyで処理
-    """
+    """動画の1フレームをBase64画像として受け取り、detect.pyで処理"""
     try:
         data = request.get_json()
         image_data = data.get('image_data', '')
-        frame_number = data.get('frame_number', 0)  # フレーム番号を取得
+        frame_number = data.get('frame_number', 0)
 
         if not image_data:
             return jsonify({'success': False, 'error': 'image_dataが必要です'}), 400
 
-        # 最初のフレーム（frame_number == 0）の場合、CSVを初期化
         if frame_number == 0:
             csv_header = ["メッシュID", "パス", "総合スコア", "Pitchスコア", "Yawスコア", "EARスコア", "Pitch角度(度)", "Yaw角度(度)", "EAR値", "ランドマーク画像"]
             with open(CSV_PATH, 'w', newline='', encoding='utf-8') as f:
@@ -270,7 +236,6 @@ def detect_frame():
                 writer.writerow(csv_header)
             print(f"✅ CSV初期化: {CSV_PATH}")
 
-        # Base64 画像データをファイルに保存
         import base64
         if ',' in image_data:
             image_data = image_data.split(',')[1]
@@ -278,12 +243,10 @@ def detect_frame():
         frame_bytes = base64.b64decode(image_data)
         frame_filename = f'frame_{frame_number}.jpg'
         frame_path = os.path.join(TEMP_INPUT_DIR, frame_filename)
-        
+
         with open(frame_path, 'wb') as f:
             f.write(frame_bytes)
 
-        # detect.py を実行（フレーム処理用）
-        # --append-csv オプションを追加して追記モードで実行
         detect_cmd = [
             sys.executable, "detect.py",
             "--weights", "yolov7.pt",
@@ -293,7 +256,7 @@ def detect_frame():
             "--class", "0",
             "--save-txt",
             "--save-faces",
-            "--append-csv"  # 追記モード
+            "--append-csv"
         ]
 
         result = subprocess.run(
@@ -310,16 +273,14 @@ def detect_frame():
 
         print(f"✅ Frame {frame_number} 処理完了")
 
-        # CSVから検出結果を読み込む
         if os.path.exists(CSV_PATH):
             with open(CSV_PATH, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 rows = list(reader)
-                
+
                 print(f"📊 CSV行数: {len(rows)}, フレーム番号: {frame_number}")
 
                 def parse_row(row_dict):
-                    """CSVの1行からスコア情報を安全に取り出す"""
                     ear_value_local = row_dict.get('EAR値', '0')
                     extras_local = row_dict.get(None)
                     if extras_local:
@@ -334,6 +295,7 @@ def detect_frame():
                                     break
                             except Exception:
                                 continue
+
                     path_val = row_dict.get('パス', '')
                     filename_only = os.path.basename(path_val)
                     face_url = f"/images/faces/{filename_only}" if filename_only else ''
@@ -343,6 +305,7 @@ def detect_frame():
                     if landmark_img_val:
                         landmark_base = os.path.basename(landmark_img_val)
                         landmark_url = f"/images/faces/{landmark_base}"
+
                     return {
                         'mesh_id': row_dict.get('メッシュID', ''),
                         'path': row_dict.get('パス', ''),
@@ -359,7 +322,6 @@ def detect_frame():
 
                 faces = []
                 if rows:
-                    # frame_number に対応する行だけを抽出（ファイル名末尾の _{frame}.jpg で判定）
                     suffix = f"_{frame_number}.jpg"
                     for row in rows:
                         info = parse_row(row)
@@ -367,13 +329,11 @@ def detect_frame():
                         if filename.endswith(suffix):
                             faces.append(info)
 
-                    # 互換性のため、該当がなければ最後の行を使用
                     if not faces:
                         faces.append(parse_row(rows[-1]))
 
                     print(f"  フレーム {frame_number} の顔数: {len(faces)}")
 
-                    # landmark 有無判定（先頭のみ返しつつ、全顔リストも返す）
                     first = faces[0]
                     landmark_detected = bool(first.get('landmark_img')) or (str(first.get('ear_value', '')).strip() not in ('', '0', '0.0'))
 
@@ -392,7 +352,6 @@ def detect_frame():
                                 'landmark_url': f.get('landmark_url', ''),
                             } for f in faces
                         ],
-                        # 既存フロント互換のため、先頭の顔情報も返す
                         'pitch_score': first.get('pitch_score', '0'),
                         'yaw_score': first.get('yaw_score', '0'),
                         'ear_score': first.get('ear_score', '0'),
@@ -416,7 +375,6 @@ def detect_frame():
         return jsonify({'success': False, 'error': f'サーバーエラー: {str(e)}'}), 500
 
 
-# ★修正: 画像ファイルを提供するためのルート
 @app.route('/images/faces/<path:filename>')
 def serve_faces(filename):
     return send_from_directory(FACES_DIR, filename)
@@ -424,15 +382,10 @@ def serve_faces(filename):
 
 @app.route('/api/mesh_images', methods=['GET'])
 def get_mesh_images():
-    """
-    メッシュ画像を取得するエンドポイント
-    """
     try:
-        # メッシュ画像ディレクトリを確認
         if not os.path.exists(FACES_DIR):
             return jsonify({"error": "メッシュ画像ディレクトリが存在しません。"}), 404
 
-        # メッシュ画像を取得
         mesh_images = []
         for filename in os.listdir(FACES_DIR):
             if filename.endswith(('.png', '.jpg', '.jpeg')):
@@ -445,32 +398,25 @@ def get_mesh_images():
         return jsonify({"error": str(e)}), 500
 
 
-# 新規追加: 動画の各フレームのメッシュ画像と評価値を取得するエンドポイント
 @app.route('/api/video_frames', methods=['GET'])
 def get_video_frames():
-    """
-    動画の各フレームのメッシュ画像と評価値を取得するエンドポイント
-    CSVから読み込んだデータを返す
-    """
     try:
-        # CSVから結果を読み込む
         results = load_results_from_csv()
-        
+
         print(f"📊 /api/video_frames: CSVから読み込んだ結果数: {len(results)}")
-        
-        # フレームデータを構築
+
         frame_data = []
         for result in results:
             frame_data.append({
                 "filename": result['filename'],
                 "url": result['url'],
-                "landmark_url": result.get('landmark_url', ''),  # ランドマーク画像URL
-                "pitch_angle": result['pitch_angle'],      # 角度（度）
-                "yaw_angle": result['yaw_angle'],          # 角度（度）
-                "ear_value": result['ear_value'],          # EAR値
-                "pitch_score": result['pitch_score'],      # スコア
-                "yaw_score": result['yaw_score'],          # スコア
-                "ear_score": result['ear_score']           # スコア
+                "landmark_url": result.get('landmark_url', ''),
+                "pitch_angle": result['pitch_angle'],
+                "yaw_angle": result['yaw_angle'],
+                "ear_value": result['ear_value'],
+                "pitch_score": result['pitch_score'],
+                "yaw_score": result['yaw_score'],
+                "ear_score": result['ear_score']
             })
 
         return jsonify({"frames": frame_data})
@@ -480,5 +426,4 @@ def get_video_frames():
 
 
 if __name__ == '__main__':
-    # ポート 5000 が使用中の場合は 5001 を使用
     app.run(host='127.0.0.1', port=5001, debug=True)
