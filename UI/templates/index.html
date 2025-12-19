@@ -1514,6 +1514,7 @@
     // ========== 動画処理機能 ==========
   let videoScores = [];
   let videoScoresById = {};
+  let videoFaceImageById = {};
 
     document.getElementById('videoUploadBtn').addEventListener('click', function() {
       const videoInput = document.getElementById('videoInput');
@@ -1547,6 +1548,7 @@
 
   videoScores = [];
   videoScoresById = {};
+  videoFaceImageById = {};
         
         showVideoStatus('動画処理中...', '');
         document.getElementById('videoProgressDiv').style.display = 'block';
@@ -1605,6 +1607,12 @@
                   };
                   if (!videoScoresById[id]) videoScoresById[id] = [];
                   videoScoresById[id].push(entry);
+
+                  // 最初に検出した顔画像URLを保存（既にあれば上書きしない）
+                  const faceUrl = face.landmark_url || face.face_url || '';
+                  if (faceUrl && !videoFaceImageById[id]) {
+                    videoFaceImageById[id] = faceUrl;
+                  }
                 });
               } else if (data && (data.pitch_angle !== undefined && data.pitch_angle !== null
                   || data.yaw_angle !== undefined && data.yaw_angle !== null
@@ -1803,18 +1811,60 @@
         wrapper.style.padding = '12px';
         wrapper.style.borderRadius = '8px';
         wrapper.style.background = '#fafafa';
+        wrapper.style.marginBottom = '12px';
 
         const title = document.createElement('h4');
         title.textContent = `Face ID: ${meshId}`;
         title.style.margin = '0 0 8px 0';
         wrapper.appendChild(title);
 
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.gap = '12px';
+        row.style.alignItems = 'flex-start';
+        row.style.flexWrap = 'wrap';
+        wrapper.appendChild(row);
+
+        const canvasContainer = document.createElement('div');
+        canvasContainer.style.flex = '1 1 720px';
         const canvas = document.createElement('canvas');
         canvas.width = 1000;
         canvas.height = 400;
         canvas.style.border = '1px solid #ddd';
         canvas.style.marginBottom = '8px';
-        wrapper.appendChild(canvas);
+        canvasContainer.appendChild(canvas);
+        row.appendChild(canvasContainer);
+
+        const imgContainer = document.createElement('div');
+        imgContainer.style.flex = '0 0 180px';
+        imgContainer.style.display = 'flex';
+        imgContainer.style.flexDirection = 'column';
+        imgContainer.style.alignItems = 'center';
+        imgContainer.style.gap = '6px';
+        const imgTitle = document.createElement('div');
+        imgTitle.textContent = '初回検出の顔';
+        imgTitle.style.fontSize = '12px';
+        imgTitle.style.color = '#555';
+        imgContainer.appendChild(imgTitle);
+
+        const faceUrl = videoFaceImageById[meshId];
+        if (faceUrl) {
+          const img = document.createElement('img');
+          img.src = faceUrl;
+          img.alt = `Face ID ${meshId}`;
+          img.style.width = '160px';
+          img.style.borderRadius = '6px';
+          img.style.border = '1px solid #ccc';
+          imgContainer.appendChild(img);
+        } else {
+          const noImg = document.createElement('div');
+          noImg.textContent = '画像なし';
+          noImg.style.fontSize = '12px';
+          noImg.style.color = '#999';
+          imgContainer.appendChild(noImg);
+        }
+
+        row.appendChild(imgContainer);
         container.appendChild(wrapper);
 
         drawSingleScoreGraph(scores, canvas, meshId);

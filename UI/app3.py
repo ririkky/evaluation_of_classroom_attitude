@@ -334,6 +334,15 @@ def detect_frame():
                                     break
                             except Exception:
                                 continue
+                    path_val = row_dict.get('パス', '')
+                    filename_only = os.path.basename(path_val)
+                    face_url = f"/images/faces/{filename_only}" if filename_only else ''
+
+                    landmark_img_val = row_dict.get('ランドマーク画像', '')
+                    landmark_url = ''
+                    if landmark_img_val:
+                        landmark_base = os.path.basename(landmark_img_val)
+                        landmark_url = f"/images/faces/{landmark_base}"
                     return {
                         'mesh_id': row_dict.get('メッシュID', ''),
                         'path': row_dict.get('パス', ''),
@@ -344,6 +353,8 @@ def detect_frame():
                         'yaw_angle': row_dict.get('Yaw角度(度)', '0'),
                         'ear_value': ear_value_local,
                         'landmark_img': row_dict.get('ランドマーク画像', ''),
+                        'face_url': face_url,
+                        'landmark_url': landmark_url,
                     }
 
                 faces = []
@@ -377,6 +388,8 @@ def detect_frame():
                                 'pitch_angle': f.get('pitch_angle', '0'),
                                 'yaw_angle': f.get('yaw_angle', '0'),
                                 'ear_value': f.get('ear_value', '0'),
+                                'face_url': f.get('face_url', ''),
+                                'landmark_url': f.get('landmark_url', ''),
                             } for f in faces
                         ],
                         # 既存フロント互換のため、先頭の顔情報も返す
