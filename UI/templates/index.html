@@ -459,6 +459,9 @@
           <div id="videoFrameCount" style="font-size: 14px; font-weight: bold; margin-bottom: 10px; color: #333;">
             フレーム数: 0 / 0
           </div>
+          <div id="videoMissingCount" style="font-size: 14px; font-weight: bold; margin-bottom: 10px; color: #d32f2f;">
+            ランドマーク未検出フレーム: 0
+          </div>
           <div style="width: 100%; height: 30px; background-color: #e0e0e0; border-radius: 15px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);">
             <div id="videoProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #4CAF50, #81C784); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; transition: width 0.3s ease;">
               0%
@@ -1511,8 +1514,10 @@
       }
     }
 
-    // ========== 動画処理機能 ==========
-    let videoScores = [];
+  // ========== 動画処理機能 ==========
+  let videoScores = [];
+  let videoMissingCount = 0; // ランドマーク未検出フレーム数
+  let currentTotalFrames = 0;
 
     document.getElementById('videoUploadBtn').addEventListener('click', function() {
       const videoInput = document.getElementById('videoInput');
@@ -1544,7 +1549,12 @@
         const totalFrames = Math.ceil(video.duration * fps);
         let frameCount = 0;
 
-        videoScores = [];
+  videoScores = [];
+  videoMissingCount = 0;
+  currentTotalFrames = totalFrames;
+  // 初期表示更新
+  const missingDivInit = document.getElementById('videoMissingCount');
+  if (missingDivInit) missingDivInit.textContent = `ランドマーク未検出フレーム: ${videoMissingCount}`;
         
         showVideoStatus('動画処理中...', '');
         document.getElementById('videoProgressDiv').style.display = 'block';
@@ -1581,13 +1591,13 @@
             .then(data => {
               console.log('Frame response:', data);
 
-              // ランドマークが検出されなかったフレームは評価対象外にする
-              // サーバー側の /api/detect_frame は、検出があった場合に
-              // 'pitch_angle','yaw_angle','ear_value' を返す（CSVの行がある場合）。
-              // 検出がなかった場合はこれらのフィールドが返らないため、それを基準に判定する。
-              if (data && (data.pitch_angle !== undefined && data.pitch_angle !== null
+              // ランドマーク検出の有無を判定。サーバーが landmark_detected を返す場合はそれを優先
+              const detectedFlag = (data && (typeof data.landmark_detected !== 'undefined')) ? data.landmark_detected : null;
+              const hasDetection = detectedFlag !== null ? detectedFlag : (data && (data.pitch_angle !== undefined && data.pitch_angle !== null
                   || data.yaw_angle !== undefined && data.yaw_angle !== null
-                  || data.ear_value !== undefined && data.ear_value !== null)) {
+                  || data.ear_value !== undefined && data.ear_value !== null));
+
+              if (hasDetection) {
                 const scoreData = {
                   frameNumber: frameCount,
                   pitchScore: parseInt(data.pitch_score) || 0,
@@ -1598,8 +1608,11 @@
                 videoScores.push(scoreData);
                 console.log('Added score:', scoreData, 'Total scores:', videoScores.length);
               } else {
-                // ランドマークが検出されていないフレームは無視する
-                console.log('No landmarks detected for this frame. Skipping frame', frameCount);
+                // 未検出フレームはカウントアップして表示
+                videoMissingCount++;
+                const missingDiv = document.getElementById('videoMissingCount');
+                if (missingDiv) missingDiv.textContent = `ランドマーク未検出フレーム: ${videoMissingCount}`;
+                console.log('No landmarks detected for this frame. Skipping frame', frameCount, ' (missingCount=', videoMissingCount, ')');
               }
 
               // フレームカウントを先に増やす
@@ -1683,6 +1696,11 @@
         // 写真表示タブにもデータを表示
         console.log('Calling displayVideoPhotos()');
         displayVideoPhotos();
+        // 最終の未検出数を表示（総フレームに対する割合）
+        const missingDiv = document.getElementById('videoMissingCount');
+        if (missingDiv) {
+          missingDiv.textContent = `ランドマーク未検出フレーム: ${videoMissingCount} / ${currentTotalFrames}`;
+        }
       }, 100);
     }
 
@@ -1721,17 +1739,17 @@
               evaluationDiv.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;';
               evaluationDiv.innerHTML = `
                 <div style="padding: 12px; background: #fff3cd; border-radius: 5px; border: 1px solid #ffc107;">
-                  <strong style="font-size: 12px; color: #856404;">Pitch</strong>
+                  <strong style="font-size: 12px; color: #856404;">顔の傾き（縦方向）</strong>
                   <p style="margin: 8px 0 4px 0; font-size: 14px; font-weight: bold; color: #FF6F00;">スコア: ${frame.pitch_score || '0'}</p>
                   <p style="margin: 4px 0 0 0; font-size: 11px; color: #856404;">角度: ${frame.pitch_angle || frame.pitch || '0'}°</p>
                 </div>
                 <div style="padding: 12px; background: #d1ecf1; border-radius: 5px; border: 1px solid #17a2b8;">
-                  <strong style="font-size: 12px; color: #0c5460;">Yaw</strong>
+                  <strong style="font-size: 12px; color: #0c5460;">顔の傾き（横方向）</strong>
                   <p style="margin: 8px 0 4px 0; font-size: 14px; font-weight: bold; color: #2196F3;">スコア: ${frame.yaw_score || '0'}</p>
                   <p style="margin: 4px 0 0 0; font-size: 11px; color: #0c5460;">角度: ${frame.yaw_angle || frame.yaw || '0'}°</p>
                 </div>
                 <div style="padding: 12px; background: #d4edda; border-radius: 5px; border: 1px solid #28a745;">
-                  <strong style="font-size: 12px; color: #155724;">EAR</strong>
+                  <strong style="font-size: 12px; color: #155724;">開眼度</strong>
                   <p style="margin: 8px 0 4px 0; font-size: 14px; font-weight: bold; color: #4CAF50;">スコア: ${frame.ear_score || '0'}</p>
                   <p style="margin: 4px 0 0 0; font-size: 11px; color: #155724;">値: ${frame.ear_value || '0'}</p>
                 </div>
@@ -1795,6 +1813,34 @@
       ctx.moveTo(padding, padding + graphHeight);
       ctx.lineTo(width - padding, padding + graphHeight);
       ctx.stroke();
+
+      // X軸目盛り（フレーム番号）を10フレームごとに表示
+      if (videoScores && videoScores.length > 0) {
+        const frameNums = videoScores.map(d => d.frameNumber);
+        const minFrame = Math.min(...frameNums);
+        const maxFrame = Math.max(...frameNums);
+        let tickInterval = 10; // デフォルトは10フレームごと
+        if (maxFrame - minFrame < 10) tickInterval = 1; // 範囲が小さいときは1刻み
+
+        ctx.fillStyle = '#333';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+
+        for (let f = Math.ceil(minFrame / tickInterval) * tickInterval; f <= maxFrame; f += tickInterval) {
+          const x = padding + (graphWidth * (f - minFrame)) / Math.max(1, (maxFrame - minFrame));
+          // 小さな目盛り線
+          ctx.strokeStyle = '#666';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(x, padding + graphHeight);
+          ctx.lineTo(x, padding + graphHeight + 6);
+          ctx.stroke();
+
+          // ラベル
+          ctx.fillText(String(f), x, padding + graphHeight + 8);
+        }
+      }
 
       // Y軸
       ctx.beginPath();
@@ -2046,9 +2092,9 @@
               const evaluationDiv = document.createElement('div');
               evaluationDiv.classList.add('evaluation');
               evaluationDiv.innerHTML = `
-                <span><strong>Pitch:</strong> ${frame.pitch}</span>
-                <span><strong>Yaw:</strong> ${frame.yaw}</span>
-                <span><strong>EAR:</strong> ${frame.ear}</span>
+                <span><strong>顔の傾き（縦方向）:</strong> ${frame.pitch_angle || frame.pitch || '-'}° (スコア: ${frame.pitch_score || '0'})</span>
+                <span><strong>顔の傾き（横方向）:</strong> ${frame.yaw_angle || frame.yaw || '-'}° (スコア: ${frame.yaw_score || '0'})</span>
+                <span><strong>開眼度:</strong> ${frame.ear_value || frame.ear || '-'} (スコア: ${frame.ear_score || '0'})</span>
               `;
 
               frameItem.appendChild(imgElement);
