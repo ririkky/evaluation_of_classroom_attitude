@@ -26,28 +26,71 @@ def load_results_from_csv():
     image_map = []
 
     try:
-        # detect.pyが出力したCSVを読み込む
+        # detect.pyが出力したCSVを読み込む（ヘッダと行をインデックスで扱い、カラムずれに耐性を持たせる）
         with open(CSV_PATH, mode='r', encoding='utf-8') as file:
-            reader = csv.DictReader(file)
+            reader = csv.reader(file)
+            header = next(reader)
+
+            # ヘッダのインデックスを探す（存在しない場合は -1）
+            def idx(name):
+                try:
+                    return header.index(name)
+                except ValueError:
+                    return -1
+
+            im_idx = idx('メッシュID')
+            path_idx = idx('パス')
+            total_idx = idx('総合スコア')
+            pitch_score_idx = idx('Pitchスコア')
+            yaw_score_idx = idx('Yawスコア')
+            ear_score_idx = idx('EARスコア')
+            pitch_angle_idx = idx('Pitch角度(度)')
+            yaw_angle_idx = idx('Yaw角度(度)')
+            ear_idx = idx('EAR値')
+            landmark_idx = idx('ランドマーク画像')
+
+            def get_at(row, i):
+                return row[i].strip() if (0 <= i < len(row)) else ''
 
             for row in reader:
-                mesh_id         = row.get('メッシュID', '').strip()
-                path_value      = row.get('パス', '').strip() # ここにはファイル名が入っている想定
-                total_score     = row.get('総合スコア', '').strip()
-                pitch_score     = row.get('Pitchスコア', '').strip()
-                yaw_score       = row.get('Yawスコア', '').strip()
-                ear_score       = row.get('EARスコア', '').strip()
-                pitch_angle     = row.get('Pitch角度(度)', '').strip()      # 検出値
-                yaw_angle       = row.get('Yaw角度(度)', '').strip()        # 検出値
-                ear_value       = row.get('EAR値', '').strip()             # 検出値
-                landmark_img    = row.get('ランドマーク画像', '').strip()   # ランドマーク画像
+                mesh_id = get_at(row, im_idx)
+                path_value = get_at(row, path_idx)
+                total_score = get_at(row, total_idx)
+                pitch_score = get_at(row, pitch_score_idx)
+                yaw_score = get_at(row, yaw_score_idx)
+                ear_score = get_at(row, ear_score_idx)
+                pitch_angle = get_at(row, pitch_angle_idx)
+                yaw_angle = get_at(row, yaw_angle_idx)
+                ear_value = get_at(row, ear_idx)
+                landmark_img = get_at(row, landmark_idx)
+
+                # ヘッダとデータのずれの可能性に備え、ランドマークの位置に数値がある場合は
+                # それが実際の EAR 値（もしくはその他の数値）であり、次のカラムがランドマーク画像名である
+                # ことが多いため補正する。
+                def is_float_str(s):
+                    try:
+                        float(str(s))
+                        return True
+                    except Exception:
+                        return False
+
+                if landmark_img and is_float_str(landmark_img):
+                    # 例: landmark_img が '0.109' のような数値になっている場合
+                    # 次のカラムに画像ファイル名が入っている可能性が高い
+                    next_idx = landmark_idx + 1
+                    next_val = get_at(row, next_idx)
+                    if next_val:
+                        # もし ear_value が空または 0 系なら、ここで補正する
+                        if ear_value in ('', '0', '0.0'):
+                            ear_value = landmark_img
+                        landmark_img = next_val
 
                 # パスが絶対パスや重複パスになっていないか考慮し、ファイル名だけ抽出
                 filename = os.path.basename(path_value)
-                
+
                 # 実際の画像ファイルの場所を確認
                 image_path = os.path.join(FACES_DIR, filename)
-                
+
                 if not os.path.exists(image_path):
                     # 画像がない場合はデバッグ表示してスキップ（顔が検出されなかったフレーム）
                     print(f"⚠️ Image file not found (face not detected): {image_path}")
@@ -56,7 +99,7 @@ def load_results_from_csv():
 
                 # ブラウザ用URL (Flaskのルート経由)
                 image_url = f"/images/faces/{filename}"
-                
+
                 # ランドマーク画像のURLも生成
                 landmark_url = ""
                 if landmark_img:
@@ -78,10 +121,10 @@ def load_results_from_csv():
                     'pitch_score': pitch_score,
                     'yaw_score': yaw_score,
                     'ear_score': ear_score,
-                    'pitch_angle': pitch_angle,      # 検出値
-                    'yaw_angle': yaw_angle,          # 検出値
-                    'ear_value': ear_value,          # 検出値
-                    'landmark_url': landmark_url,    # ランドマーク画像
+                    'pitch_angle': pitch_angle,
+                    'yaw_angle': yaw_angle,
+                    'ear_value': ear_value,
+                    'landmark_url': landmark_url,
                 })
 
     except FileNotFoundError:
@@ -267,25 +310,83 @@ def detect_frame():
 
         print(f"✅ Frame {frame_number} 処理完了")
 
-        # CSVから検出結果を読み込む（最後の行を取得）
+        # CSVから検出結果を読み込む
         if os.path.exists(CSV_PATH):
             with open(CSV_PATH, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 rows = list(reader)
                 
                 print(f"📊 CSV行数: {len(rows)}, フレーム番号: {frame_number}")
-                
+
+                def parse_row(row_dict):
+                    """CSVの1行からスコア情報を安全に取り出す"""
+                    ear_value_local = row_dict.get('EAR値', '0')
+                    extras_local = row_dict.get(None)
+                    if extras_local:
+                        for ex in extras_local:
+                            if ex is None:
+                                continue
+                            exs = str(ex).strip()
+                            try:
+                                float(exs)
+                                if ear_value_local in ('', '0', '0.0'):
+                                    ear_value_local = exs
+                                    break
+                            except Exception:
+                                continue
+                    return {
+                        'mesh_id': row_dict.get('メッシュID', ''),
+                        'path': row_dict.get('パス', ''),
+                        'pitch_score': row_dict.get('Pitchスコア', '0'),
+                        'yaw_score': row_dict.get('Yawスコア', '0'),
+                        'ear_score': row_dict.get('EARスコア', '0'),
+                        'pitch_angle': row_dict.get('Pitch角度(度)', '0'),
+                        'yaw_angle': row_dict.get('Yaw角度(度)', '0'),
+                        'ear_value': ear_value_local,
+                        'landmark_img': row_dict.get('ランドマーク画像', ''),
+                    }
+
+                faces = []
                 if rows:
-                    last_row = rows[-1]
-                    print(f"  最終行データ: mesh_id={last_row.get('メッシュID')}, path={last_row.get('パス')}")
+                    # frame_number に対応する行だけを抽出（ファイル名末尾の _{frame}.jpg で判定）
+                    suffix = f"_{frame_number}.jpg"
+                    for row in rows:
+                        info = parse_row(row)
+                        filename = os.path.basename(info.get('path', ''))
+                        if filename.endswith(suffix):
+                            faces.append(info)
+
+                    # 互換性のため、該当がなければ最後の行を使用
+                    if not faces:
+                        faces.append(parse_row(rows[-1]))
+
+                    print(f"  フレーム {frame_number} の顔数: {len(faces)}")
+
+                    # landmark 有無判定（先頭のみ返しつつ、全顔リストも返す）
+                    first = faces[0]
+                    landmark_detected = bool(first.get('landmark_img')) or (str(first.get('ear_value', '')).strip() not in ('', '0', '0.0'))
+
                     return jsonify({
                         'success': True,
-                        'pitch_score': last_row.get('Pitchスコア', '0'),
-                        'yaw_score': last_row.get('Yawスコア', '0'),
-                        'ear_score': last_row.get('EARスコア', '0'),
-                        'pitch_angle': last_row.get('Pitch角度(度)', '0'),
-                        'yaw_angle': last_row.get('Yaw角度(度)', '0'),
-                        'ear_value': last_row.get('EAR値', '0')
+                        'faces': [
+                            {
+                                'mesh_id': f.get('mesh_id', ''),
+                                'pitch_score': f.get('pitch_score', '0'),
+                                'yaw_score': f.get('yaw_score', '0'),
+                                'ear_score': f.get('ear_score', '0'),
+                                'pitch_angle': f.get('pitch_angle', '0'),
+                                'yaw_angle': f.get('yaw_angle', '0'),
+                                'ear_value': f.get('ear_value', '0'),
+                            } for f in faces
+                        ],
+                        # 既存フロント互換のため、先頭の顔情報も返す
+                        'pitch_score': first.get('pitch_score', '0'),
+                        'yaw_score': first.get('yaw_score', '0'),
+                        'ear_score': first.get('ear_score', '0'),
+                        'pitch_angle': first.get('pitch_angle', '0'),
+                        'yaw_angle': first.get('yaw_angle', '0'),
+                        'ear_value': first.get('ear_value', '0'),
+                        'landmark_detected': landmark_detected
                     })
                 else:
                     print(f"⚠️ CSVに行がありません（フレーム {frame_number}）")

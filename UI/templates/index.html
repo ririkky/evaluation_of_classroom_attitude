@@ -477,8 +477,8 @@
       <div id="video-graph-tab" class="sub-tab-content active" style="display: block;">
         <h2>📊 グラフ表示</h2>
         <div id="videoGraphDiv" style="margin-top: 30px;">
-          <h3>評価スコアの推移</h3>
-          <canvas id="scoreGraph" width="1000" height="400" style="border: 1px solid #ddd; margin-bottom: 20px;"></canvas>
+          <h3>評価スコアの推移（人物ごと）</h3>
+          <div id="scoreGraphsContainer" style="display: flex; flex-direction: column; gap: 24px;"></div>
           <h3>平均値一覧</h3>
           <div id="scoreAverageTable" style="margin-bottom: 30px;"></div>
         </div>
@@ -1512,7 +1512,8 @@
     }
 
     // ========== 動画処理機能 ==========
-    let videoScores = [];
+  let videoScores = [];
+  let videoScoresById = {};
 
     document.getElementById('videoUploadBtn').addEventListener('click', function() {
       const videoInput = document.getElementById('videoInput');
@@ -1544,7 +1545,8 @@
         const totalFrames = Math.ceil(video.duration * fps);
         let frameCount = 0;
 
-        videoScores = [];
+  videoScores = [];
+  videoScoresById = {};
         
         showVideoStatus('動画処理中...', '');
         document.getElementById('videoProgressDiv').style.display = 'block';
@@ -1585,18 +1587,43 @@
               // サーバー側の /api/detect_frame は、検出があった場合に
               // 'pitch_angle','yaw_angle','ear_value' を返す（CSVの行がある場合）。
               // 検出がなかった場合はこれらのフィールドが返らないため、それを基準に判定する。
-              if (data && (data.pitch_angle !== undefined && data.pitch_angle !== null
+              const hasFacesArray = data && Array.isArray(data.faces) && data.faces.length > 0;
+
+              if (hasFacesArray) {
+                data.faces.forEach(face => {
+                  const id = String(face.mesh_id || 'unknown');
+                  const pitchScore = parseInt(face.pitch_score) || 0;
+                  const yawScore   = parseInt(face.yaw_score)   || 0;
+                  const earScore   = parseInt(face.ear_score)   || 0;
+                  const totalScore = pitchScore + yawScore + earScore;
+                  const entry = {
+                    frameNumber: frameCount,
+                    pitchScore,
+                    yawScore,
+                    earScore,
+                    totalScore
+                  };
+                  if (!videoScoresById[id]) videoScoresById[id] = [];
+                  videoScoresById[id].push(entry);
+                });
+              } else if (data && (data.pitch_angle !== undefined && data.pitch_angle !== null
                   || data.yaw_angle !== undefined && data.yaw_angle !== null
                   || data.ear_value !== undefined && data.ear_value !== null)) {
-                const scoreData = {
+                // 後方互換: 単一顔の応答の場合
+                const pitchScore = parseInt(data.pitch_score) || 0;
+                const yawScore   = parseInt(data.yaw_score)   || 0;
+                const earScore   = parseInt(data.ear_score)   || 0;
+                const totalScore = pitchScore + yawScore + earScore;
+                const entry = {
                   frameNumber: frameCount,
-                  pitchScore: parseInt(data.pitch_score) || 0,
-                  yawScore: parseInt(data.yaw_score) || 0,
-                  earScore: parseInt(data.ear_score) || 0,
-                  totalScore: (parseInt(data.pitch_score) || 0) + (parseInt(data.yaw_score) || 0) + (parseInt(data.ear_score) || 0)
+                  pitchScore,
+                  yawScore,
+                  earScore,
+                  totalScore
                 };
-                videoScores.push(scoreData);
-                console.log('Added score:', scoreData, 'Total scores:', videoScores.length);
+                videoScores.push(entry);
+                if (!videoScoresById['unknown']) videoScoresById['unknown'] = [];
+                videoScoresById['unknown'].push(entry);
               } else {
                 // ランドマークが検出されていないフレームは無視する
                 console.log('No landmarks detected for this frame. Skipping frame', frameCount);
@@ -1641,14 +1668,15 @@
     }
 
     function displayVideoResults() {
-      console.log('displayVideoResults called, videoScores.length:', videoScores.length);
+      const totalDetections = Object.values(videoScoresById).reduce((acc, arr) => acc + arr.length, 0);
+      console.log('displayVideoResults called, total detections:', totalDetections);
       
-      if (videoScores.length === 0) {
+      if (totalDetections === 0) {
         showVideoStatus('検出されたフレームがありません', 'error');
         return;
       }
 
-      console.log('videoScores:', videoScores);
+      console.log('videoScoresById:', videoScoresById);
       
       // グラフ表示タブを表示
       const graphTab = document.getElementById('video-graph-tab');
@@ -1753,12 +1781,49 @@
 
     function drawScoreGraph() {
       console.log('drawScoreGraph called');
-      const canvas = document.getElementById('scoreGraph');
-      if (!canvas) {
-        console.error('キャンバス要素が見つかりません');
+      const container = document.getElementById('scoreGraphsContainer');
+      if (!container) {
+        console.error('scoreGraphsContainer not found');
         return;
       }
 
+      container.innerHTML = '';
+      const entries = Object.entries(videoScoresById);
+      if (!entries.length) {
+        container.innerHTML = '<p style="color:#666;">データがありません</p>';
+        displayScoreAverageTable();
+        return;
+      }
+
+      entries.forEach(([meshId, scores]) => {
+        if (!scores || !scores.length) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.style.border = '1px solid #ddd';
+        wrapper.style.padding = '12px';
+        wrapper.style.borderRadius = '8px';
+        wrapper.style.background = '#fafafa';
+
+        const title = document.createElement('h4');
+        title.textContent = `Face ID: ${meshId}`;
+        title.style.margin = '0 0 8px 0';
+        wrapper.appendChild(title);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 1000;
+        canvas.height = 400;
+        canvas.style.border = '1px solid #ddd';
+        canvas.style.marginBottom = '8px';
+        wrapper.appendChild(canvas);
+        container.appendChild(wrapper);
+
+        drawSingleScoreGraph(scores, canvas, meshId);
+      });
+
+      displayScoreAverageTable();
+    }
+
+    function drawSingleScoreGraph(scores, canvas, meshId) {
       const ctx = canvas.getContext('2d');
       const width = canvas.width;
       const height = canvas.height;
@@ -1766,11 +1831,9 @@
       const graphWidth = width - padding * 2;
       const graphHeight = height - padding * 2;
 
-      // 背景
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, width, height);
 
-      // グリッドライン
       ctx.strokeStyle = '#e0e0e0';
       ctx.lineWidth = 1;
       for (let i = 0; i <= 100; i += 10) {
@@ -1780,7 +1843,6 @@
         ctx.lineTo(width - padding, y);
         ctx.stroke();
 
-        // Y軸ラベル
         ctx.fillStyle = '#666';
         ctx.font = '12px Arial';
         ctx.textAlign = 'right';
@@ -1788,7 +1850,6 @@
         ctx.fillText(i, padding - 10, y);
       }
 
-      // X軸
       ctx.strokeStyle = '#333';
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -1796,13 +1857,11 @@
       ctx.lineTo(width - padding, padding + graphHeight);
       ctx.stroke();
 
-      // Y軸
       ctx.beginPath();
       ctx.moveTo(padding, padding);
       ctx.lineTo(padding, padding + graphHeight);
       ctx.stroke();
 
-      // ラベル
       ctx.fillStyle = '#333';
       ctx.font = 'bold 14px Arial';
       ctx.textAlign = 'center';
@@ -1815,8 +1874,7 @@
       ctx.fillText('スコア (0-100)', 0, 0);
       ctx.restore();
 
-      // データを描画
-      if (!videoScores || videoScores.length === 0) {
+      if (!scores || !scores.length) {
         ctx.fillStyle = '#999';
         ctx.font = '16px Arial';
         ctx.textAlign = 'center';
@@ -1828,16 +1886,13 @@
       const colors = {
         pitch: '#FF6F00',
         yaw: '#2196F3',
-        ear: '#4CAF50'
+        ear: '#4CAF50',
+        total: '#9C27B0'
       };
 
-      // 線を描画する関数
-      // key: 'pitchScore' / 'yawScore' / 'earScore' / 'totalScore'
-      const drawLine = (key, color, label) => {
-        if (!videoScores || videoScores.length === 0) return;
-
-        // フレーム番号を使ってX位置を決定（抜けのあるフレームはスキップ済み）
-        const frameNums = videoScores.map(d => d.frameNumber);
+      const drawLine = (key, color) => {
+        if (!scores || scores.length === 0) return;
+        const frameNums = scores.map(d => d.frameNumber);
         const minFrame = Math.min(...frameNums);
         const maxFrame = Math.max(...frameNums);
         const frameRange = Math.max(1, maxFrame - minFrame);
@@ -1846,10 +1901,9 @@
         ctx.lineWidth = 2.5;
         ctx.beginPath();
 
-        videoScores.forEach((d, idx) => {
+        scores.forEach((d, idx) => {
           const x = padding + (graphWidth * (d.frameNumber - minFrame)) / frameRange;
           const y = padding + graphHeight - (graphHeight * (d[key] || 0)) / 100;
-
           if (idx === 0) {
             ctx.moveTo(x, y);
           } else {
@@ -1858,9 +1912,8 @@
         });
         ctx.stroke();
 
-        // ドット描画（有効な点のみ）
         ctx.fillStyle = color;
-        videoScores.forEach(d => {
+        scores.forEach(d => {
           const x = padding + (graphWidth * (d.frameNumber - minFrame)) / frameRange;
           const y = padding + graphHeight - (graphHeight * (d[key] || 0)) / 100;
           ctx.beginPath();
@@ -1869,93 +1922,74 @@
         });
       };
 
-  // 各スコアの線を描画（ランドマーク検出されたフレームのみ）
-  drawLine('pitchScore', colors.pitch, 'Pitch');
-  drawLine('yawScore', colors.yaw, 'Yaw');
-  drawLine('earScore', colors.ear, 'EAR');
+      drawLine('pitchScore', colors.pitch);
+      drawLine('yawScore', colors.yaw);
+      drawLine('earScore', colors.ear);
+      drawLine('totalScore', colors.total);
 
-      // 総合スコアの計算と描画
-      const avgPitch = (videoScores.reduce((a, b) => a + b.pitchScore, 0) / videoScores.length).toFixed(1);
-      const avgYaw = (videoScores.reduce((a, b) => a + b.yawScore, 0) / videoScores.length).toFixed(1);
-      const avgEAR = (videoScores.reduce((a, b) => a + b.earScore, 0) / videoScores.length).toFixed(1);
-      const avgTotal = (videoScores.reduce((a, b) => a + b.totalScore, 0) / videoScores.length).toFixed(1);
-      colors.total = '#9C27B0'; // Total score color
-
-  drawLine('totalScore', colors.total, 'Total');
-
-      // 凡例と平均値を表示
-      const legendX = width - 220;
-      const legendY = padding + 20;
-      ctx.font = '12px Arial';
-      
-      Object.entries(colors).forEach(([key, color], i) => {
-        ctx.fillStyle = color;
-        ctx.fillRect(legendX, legendY + i * 25, 12, 12);
-        ctx.fillStyle = '#333';
-        ctx.textAlign = 'left';
-        
-        let label = '';
-        let avgValue = '';
-        if (key === 'pitch') {
-          label = '顔の傾き（縦方向）';
-          avgValue = avgPitch;
-        } else if (key === 'yaw') {
-          label = '顔の傾き（横方向）';
-          avgValue = avgYaw;
-        } else if (key === 'ear') {
-          label = '開眼度';
-          avgValue = avgEAR;
-        } else if (key === 'total') {
-          label = '総合点';
-          avgValue = avgTotal;
-        }
-
-        // canvas上での表示: "顔の 傾き..." は2行に分けて描画する
-        const textX = legendX + 16;
-        const baseY = legendY + i * 25 + 6;
-        if (key === 'pitch' || key === 'yaw') {
-          // 分割して2行で描画（"顔の傾き" / "（縦方向）" の形式）
-          const prefix = '顔の傾き';
-          const rest = label.replace(prefix, '');
-          ctx.fillText(prefix, textX, baseY + 8);
-          ctx.fillText(`${rest}: ${avgValue}`, textX, baseY + 22);
-        } else {
-          ctx.fillText(`${label}: ${avgValue}`, textX, baseY + 12);
-        }
-      });
-
-      // タイトル表示
       ctx.fillStyle = '#333';
       ctx.font = 'bold 16px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText('評価スコア推移グラフ', width / 2, padding - 20);
-      
-      // 平均値テーブルを表示
-      displayScoreAverageTable();
+      ctx.fillText(`評価スコア推移 (Face ID: ${meshId})`, width / 2, padding - 20);
     }
 
     function displayScoreAverageTable() {
-      if (!videoScores || videoScores.length === 0) {
+      const tableContainer = document.getElementById('scoreAverageTable');
+      if (!tableContainer) return;
+
+      const entries = Object.entries(videoScoresById);
+      if (!entries.length) {
+        tableContainer.innerHTML = '';
         return;
       }
 
-      // 平均値を計算
-      const avgPitch = (videoScores.reduce((a, b) => a + b.pitchScore, 0) / videoScores.length).toFixed(2);
-      const avgYaw = (videoScores.reduce((a, b) => a + b.yawScore, 0) / videoScores.length).toFixed(2);
-      const avgEAR = (videoScores.reduce((a, b) => a + b.earScore, 0) / videoScores.length).toFixed(2);
-      const avgTotal = (videoScores.reduce((a, b) => a + b.totalScore, 0) / videoScores.length).toFixed(2);
-      
-      // 最大値・最小値を計算
-      const maxPitch = Math.max(...videoScores.map(d => d.pitchScore));
-      const minPitch = Math.min(...videoScores.map(d => d.pitchScore));
-      const maxYaw = Math.max(...videoScores.map(d => d.yawScore));
-      const minYaw = Math.min(...videoScores.map(d => d.yawScore));
-      const maxEAR = Math.max(...videoScores.map(d => d.earScore));
-      const minEAR = Math.min(...videoScores.map(d => d.earScore));
-      const maxTotal = Math.max(...videoScores.map(d => d.totalScore));
-      const minTotal = Math.min(...videoScores.map(d => d.totalScore));
+      const rowsHtml = entries.map(([meshId, scores]) => {
+        if (!scores.length) return '';
+        const avgPitch = (scores.reduce((a, b) => a + b.pitchScore, 0) / scores.length).toFixed(2);
+        const avgYaw   = (scores.reduce((a, b) => a + b.yawScore, 0) / scores.length).toFixed(2);
+        const avgEAR   = (scores.reduce((a, b) => a + b.earScore, 0) / scores.length).toFixed(2);
+        const avgTotal = (scores.reduce((a, b) => a + b.totalScore, 0) / scores.length).toFixed(2);
 
-      const tableContainer = document.getElementById('scoreAverageTable');
+        const maxPitch = Math.max(...scores.map(d => d.pitchScore));
+        const minPitch = Math.min(...scores.map(d => d.pitchScore));
+        const maxYaw   = Math.max(...scores.map(d => d.yawScore));
+        const minYaw   = Math.min(...scores.map(d => d.yawScore));
+        const maxEAR   = Math.max(...scores.map(d => d.earScore));
+        const minEAR   = Math.min(...scores.map(d => d.earScore));
+        const maxTotal = Math.max(...scores.map(d => d.totalScore));
+        const minTotal = Math.min(...scores.map(d => d.totalScore));
+
+        return `
+          <tr style="background-color:#eef5ff;">
+            <td colspan="4" style="padding:10px; border:1px solid #ddd; font-weight:bold;">Face ID: ${meshId}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #ddd;">
+            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: #FF6F00;">顔の傾き<br/>（縦方向）</td>
+            <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${avgPitch}</td>
+            <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${maxPitch}</td>
+            <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${minPitch}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #ddd;">
+            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: #2196F3;">顔の傾き<br/>（横方向）</td>
+            <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${avgYaw}</td>
+            <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${maxYaw}</td>
+            <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${minYaw}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #ddd;">
+            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: #4CAF50;">開眼度</td>
+            <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${avgEAR}</td>
+            <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${maxEAR}</td>
+            <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${minEAR}</td>
+          </tr>
+          <tr style="background-color: #f5f5f5;">
+            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: #9C27B0;">Total</td>
+            <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${avgTotal}</td>
+            <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${maxTotal}</td>
+            <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${minTotal}</td>
+          </tr>
+        `;
+      }).join('');
+
       tableContainer.innerHTML = `
         <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
           <thead>
@@ -1967,30 +2001,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr style="border-bottom: 1px solid #ddd;">
-              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: #FF6F00;">顔の傾き<br/>（縦方向）</td>
-              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${avgPitch}</td>
-              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${maxPitch}</td>
-              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${minPitch}</td>
-            </tr>
-            <tr style="border-bottom: 1px solid #ddd;">
-              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: #2196F3;">顔の傾き<br/>（横方向）</td>
-              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${avgYaw}</td>
-              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${maxYaw}</td>
-              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${minYaw}</td>
-            </tr>
-            <tr style="border-bottom: 1px solid #ddd;">
-              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: #4CAF50;">開眼度</td>
-              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${avgEAR}</td>
-              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${maxEAR}</td>
-              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${minEAR}</td>
-            </tr>
-            <tr style="background-color: #f5f5f5;">
-              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: #9C27B0;">Total</td>
-              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${avgTotal}</td>
-              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${maxTotal}</td>
-              <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${minTotal}</td>
-            </tr>
+            ${rowsHtml}
           </tbody>
         </table>
       `;

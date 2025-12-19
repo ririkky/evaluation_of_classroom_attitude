@@ -174,6 +174,17 @@ def detect(save_img=False):
             else:
                 p, s, im0, frame = path, '', im0s, getattr(dataset, 'frame', 0)
 
+            # 画像ファイル名からフレーム番号を推定（例: frame_12.jpg -> 12）
+            frame_from_name = None
+            try:
+                stem_parts = Path(p).stem.split('_')
+                last_token = stem_parts[-1]
+                frame_from_name = int(last_token)
+            except Exception:
+                frame_from_name = None
+
+            current_frame_num = frame_from_name if frame_from_name is not None else frame
+
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # img.jpg
             txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # img.txt
@@ -248,8 +259,8 @@ def detect(save_img=False):
                                         if opt.save_faces: # --save-faces が有効な場合のみ保存
                                             
                                             timestamp = time.strftime("%Y%m%d-%H%M%S")
-                                            # ★修正: face_id をファイル名に含めて一意にする
-                                            face_filename = f"face_id_{face_id}_{timestamp}_{frame}.jpg"
+                                            # ★修正: face_id とフレーム番号をファイル名に含めて一意にする
+                                            face_filename = f"face_id_{face_id}_{timestamp}_{current_frame_num}.jpg"
                                             
                                             # ★修正: face_output_dir (ベースパス) とファイル名を結合
                                             face_save_path = face_output_dir / face_filename
@@ -444,8 +455,7 @@ def detect(save_img=False):
                                         # 状態を描画した person_roi を im0 に戻す
                                         im0[y1:y2, x1:x2] = person_roi
 
-                                        # 1つの顔だけ処理して break
-                                        break 
+                                        # 複数人を処理するため break を削除
                                         
                             except Exception as e:
                                 print(f"Error processing face mesh: {e}")
