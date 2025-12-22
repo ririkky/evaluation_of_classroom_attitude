@@ -205,7 +205,8 @@ def detect(save_img=False):
     # -------------------------------------
 
     # --- CSVヘッダー書き込み ---
-    csv_header = ["TrackingID", "パス", "総合スコア", "Pitchスコア", "Yawスコア", "EARスコア", "Pitch(度)", "Yaw(度)", "基準Yaw(Bias)", "EAR値", "ランドマーク画像"]
+    # UI/app3.py と同一のヘッダーに揃える
+    csv_header = ["メッシュID", "パス", "総合スコア", "Pitchスコア", "Yawスコア", "EARスコア", "Pitch角度(度)", "Yaw角度(度)", "EAR値", "ランドマーク画像"]
     if not opt.append_csv:
         try:
             with open(csv_file_path, 'w', newline='', encoding='utf-8') as f_csv:
@@ -250,6 +251,17 @@ def detect(save_img=False):
                 p, s, im0, frame = path[i], '%g: ' % i, im0s[i].copy(), dataset.count
             else:
                 p, s, im0, frame = path, '', im0s, getattr(dataset, 'frame', 0)
+
+            # 画像ファイル名からフレーム番号を推定（例: frame_12.jpg -> 12）
+            frame_from_name = None
+            try:
+                stem_parts = Path(p).stem.split('_')
+                last_token = stem_parts[-1]
+                frame_from_name = int(last_token)
+            except Exception:
+                frame_from_name = None
+
+            current_frame_num = frame_from_name if frame_from_name is not None else frame
 
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # img.jpg
@@ -301,7 +313,6 @@ def detect(save_img=False):
 
                                 if results.multi_face_landmarks:
                                     for face_landmarks in results.multi_face_landmarks:
-                                        
                                         all_landmarks = face_landmarks.landmark
                                         
                                         # 変数初期化
@@ -466,7 +477,7 @@ def detect(save_img=False):
                                                     row_data = [
                                                         track_id, face_filename, total_score,
                                                         int(round(30 * pitch_score)), int(round(30 * yaw_score)), int(round(40 * ear_score)),
-                                                        f"{pitch:.1f}", f"{yaw:.1f}", f"{baseline_yaw:.1f}", f"{ear:.3f}", vis_filename
+                                                        f"{pitch:.1f}", f"{yaw:.1f}", f"{ear:.3f}", vis_filename
                                                     ]
                                                     writer.writerow(row_data)
                                             except Exception as e:
@@ -482,7 +493,7 @@ def detect(save_img=False):
                                         
                                         # ROIを戻す
                                         im0[y1:y2, x1:x2] = person_roi
-                                        break 
+                                        # 複数人を処理するため break を削除
                                         
                             except Exception as e:
                                 print(f"Error processing face mesh: {e}")
